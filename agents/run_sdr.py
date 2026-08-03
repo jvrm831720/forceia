@@ -40,6 +40,7 @@ log = get_logger("forceia.agent")
 
 _openai_clients: dict[str, OpenAI] = {}
 
+# Temperaturas por papel (SDR mais exploratorio, closer mais preciso)
 _AGENT_TEMPERATURE = {
     "sdr": 0.65,
     "closer": 0.45,
@@ -152,6 +153,47 @@ def _maybe_auto_qualify(stage: str, bant: dict | None, meta_stage: str) -> str:
 
 
 def handle_incoming(
+    number: str,
+    text: str,
+    *,
+    workspace: WorkspaceContext,
+    send: bool = True,
+    message_id: str | None = None,
+) -> str:
+    """
+    Entrada principal de uma mensagem do lead.
+    Preferencia: LangGraph (checkpoints + retries). Fallback: fluxo linear legado.
+    """
+    try:
+        from graph import graph_enabled, invoke_turn
+
+        if graph_enabled():
+            reply = invoke_turn(
+                workspace_id=workspace.id,
+                phone=number,
+                text=text,
+                workspace_slug=workspace.slug,
+                send=send,
+                message_id=message_id,
+            )
+            log.info(
+                "mensagem processada (langgraph)",
+                extra={"workspace": workspace.slug, "phone": number},
+            )
+            return reply
+    except Exception as exc:
+        log.warning(
+            "langgraph falhou, usando fluxo legado: %s",
+            exp if False else exc,
+            extra={"workspace": workspace.slug, "phone": number},
+        )
+
+    return _handle_incoming_legacy(
+        number, text, workspace=workspace, send=send, message_id=message_id
+    )
+
+
+def _handle_incoming_legacy(
     number: str,
     text: str,
     *,
