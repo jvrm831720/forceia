@@ -2,6 +2,19 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.4.0]
+
+### Adicionado
+- **LangGraph** como orquestrador do funil (`agents/graph.py`):
+  - StateGraph: prepare → generate (retry) → parse → route → persist
+  - Checkpoints por lead (`thread_id = workspace:phone`), MemorySaver ou SQLite
+  - `FORCEIA_USE_GRAPH=1` (padrao) com fallback automatico para fluxo legado
+- Dependencias: `langgraph`, `langchain-core`
+
+### Alterado
+- `run_sdr.handle_incoming` delega ao grafo quando disponivel
+- `state_machine.py` permanece como regras de transicao (fonte unica)
+
 ## [1.3.0]
 
 ### Adicionado
