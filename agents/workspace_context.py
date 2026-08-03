@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any
 
 from db import get_workspace_by_api_key, get_workspace_by_evolution_instance, get_workspace_by_slug
 
@@ -26,7 +25,7 @@ class WorkspaceContext:
     raw: dict
 
     @classmethod
-    def from_row(cls, row: dict) -> "WorkspaceContext":
+    def from_row(cls, row: dict) -> WorkspaceContext:
         return cls(
             id=row["id"],
             name=row.get("name") or row.get("slug") or "",
@@ -58,9 +57,14 @@ def resolve_workspace(
     api_key: str | None = None,
     evolution_instance: str | None = None,
     slug: str | None = None,
+    workspace_id: str | None = None,
 ) -> WorkspaceContext | None:
+    from db import get_workspace_by_id
+
     row = None
-    if api_key:
+    if workspace_id:
+        row = get_workspace_by_id(workspace_id)
+    if not row and api_key:
         row = get_workspace_by_api_key(api_key)
     if not row and evolution_instance:
         row = get_workspace_by_evolution_instance(evolution_instance)
