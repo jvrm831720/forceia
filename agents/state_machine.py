@@ -1,4 +1,10 @@
-"""ForceIA - Maquina de estados dos agentes."""
+"""
+ForceIA - Funil de vendas (estagios + transicoes).
+
+A orquestracao de turno vive em `graph.py` (LangGraph).
+Este modulo permanece como fonte unica das regras de transicao e
+mapeamento stage→agente — usado pelo grafo, intelligence e testes.
+"""
 
 from __future__ import annotations
 
@@ -21,7 +27,6 @@ def can_transition(current: str, target: str) -> bool:
 
 
 def next_agent_for_stage(stage: str) -> str:
-    """Qual agente responde em cada estagio."""
     if stage in ("sdr",):
         return "sdr"
     if stage in ("qualified", "closer"):
@@ -34,10 +39,6 @@ def next_agent_for_stage(stage: str) -> str:
 
 
 def detect_stage_from_reply(reply: str, current: str) -> str:
-    """
-    Heuristica legada baseada em tags no texto.
-    Preferir intelligence.stage_from_meta_or_tags em producao.
-    """
     upper = (reply or "").upper()
     if "[QUALIFICADO]" in upper or "[QUALIFIED]" in upper:
         if can_transition(current, "qualified"):

@@ -13,3 +13,7 @@ pydantic>=2.6.0
 
 # Banco (multi-tenant)
 supabase>=2.4.0
+
+# Orquestracao de agentes (grafo + checkpoints + retries)
+langgraph>=0.2.0
+langchain-core>=0.2.0
