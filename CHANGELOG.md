@@ -2,6 +2,15 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.5.0]
+
+### Adicionado
+- **Langfuse** observabilidade (`agents/observability.py`):
+  - Trace `forceia.turn` por mensagem (session = workspace:phone)
+  - Spans prepare/generate/parse/route/persist + generation OpenAI
+  - Eventos meta_extracted, transition, turn_error
+  - Docs `docs/OBSERVABILITY.md`
+
 ## [1.4.0]
 
 ### Adicionado
