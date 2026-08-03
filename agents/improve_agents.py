@@ -2,17 +2,17 @@
 ForceIA - Job de auto-melhoria assistida (gate humano)
 
   python improve_agents.py --workspace default
-  python improve_agents.py --workspace default --per-outcome 10
-  python improve_agents.py --apply <suggestion_id>   # aplica override
-  python improve_agents.py --approve <suggestion_id>
-  python improve_agents.py --reject <suggestion_id> --note "fora de tom"
+  python improve_agents.py --workspace default --mode hybrid
+  python improve_agents.py --workspace default --mode spin --export-prefs /tmp/prefs.json
+  python improve_agents.py --apply <suggestion_id>
   python improve_agents.py --list-pending
 
-Fluxo:
+Fluxo (STaR + SPIN):
   1) Amostra won/lost no Supabase
-  2) LLM gera insights + prompts sugeridos
-  3) Grava prompt_suggestions (pending)
-  4) Humano aprova e aplica (override ativo)
+  2) Pares preferencia SPIN + racionalizacao STaR
+  3) LLM coach gera insights + prompts sugeridos
+  4) Grava prompt_suggestions (pending)
+  5) Humano aprova e aplica (override ativo)
 """
 
 from __future__ import annotations
@@ -40,7 +40,8 @@ from learning import (
     AGENTS,
     collect_current_prompts,
     ensure_meta_protocol,
-    run_analyst,
+    export_preference_dataset,
+    run_hybrid_learning,
     sample_outcomes,
 )
 from logging_config import get_logger
@@ -58,7 +59,20 @@ def _client_for(ws: WorkspaceContext | None) -> OpenAI:
     return OpenAI(api_key=key)
 
 
-def run_learning_for_workspace(ws: WorkspaceContext, per_outcome: int = 8) -> dict:
+def run_learning_for_workspace(
+    ws: WorkspaceContext,
+    per_outcome: int = 8,
+    *,
+    mode: str = "hybrid",
+    export_prefs_path: str | None = None,
+) -> dict:
+    """
+    mode: hybrid | spin | star | classic
+      hybrid = SPIN pairs + STaR rationalization (recomendado)
+      spin   = self-play preference pairs only
+      star   = rationalize lost only
+      classic = won/lost samples only (legado)
+    """
     run = create_learning_run(ws.id)
     run_id = run.get("id")
     try:
@@ -83,13 +97,27 @@ def run_learning_for_workspace(ws: WorkspaceContext, per_outcome: int = 8) -> di
         model = ws.gpt_model or os.getenv("GPT_MODEL", "gpt-4o-mini")
         analyst_model = os.getenv("LEARNING_MODEL") or model
 
-        analysis = run_analyst(
+        analysis = run_hybrid_learning(
             client,
             model=analyst_model,
             won=won,
             lost=lost,
             current_prompts=current,
+            mode=mode,
         )
+        meta = analysis.pop("_meta", {}) or {}
+
+        if export_prefs_path and mode in ("hybrid", "spin"):
+            from learning import build_preference_pairs
+            from pathlib import Path
+
+            pairs = build_preference_pairs(won, lost, max_pairs=20)
+            dataset = export_preference_dataset(pairs)
+            Path(export_prefs_path).write_text(
+                __import__("json").dumps(dataset, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            log.info("preference dataset exported", extra={"event": export_prefs_path})
 
         suggestions_out = []
         for sug in analysis.get("suggestions") or []:
@@ -110,6 +138,11 @@ def run_learning_for_workspace(ws: WorkspaceContext, per_outcome: int = 8) -> di
                 metrics={
                     "won_sampled": len(won),
                     "lost_sampled": len(lost),
+                    "mode": mode,
+                    "spin_pairs": meta.get("pairs"),
+                    "star_rationalizations": meta.get("rationalizations"),
+                    "spin_lessons": meta.get("spin_lessons"),
+                    "source": sug.get("source") or mode,
                 },
                 current_prompt=current.get(agent, ""),
                 suggested_prompt=suggested,
@@ -118,6 +151,8 @@ def run_learning_for_workspace(ws: WorkspaceContext, per_outcome: int = 8) -> di
             suggestions_out.append(row.get("id") or agent)
 
         summary = analysis.get("summary") or f"{len(suggestions_out)} sugestoes geradas"
+        if meta:
+            summary = f"[{mode}] {summary} | pairs={meta.get('pairs')} rat={meta.get('rationalizations')}"
         finish_learning_run(
             run_id,
             status="completed",
@@ -127,13 +162,18 @@ def run_learning_for_workspace(ws: WorkspaceContext, per_outcome: int = 8) -> di
         )
         log.info(
             "learning completed",
-            extra={"workspace": ws.slug, "event": f"suggestions={len(suggestions_out)}"},
+            extra={
+                "workspace": ws.slug,
+                "event": f"mode={mode} suggestions={len(suggestions_out)}",
+            },
         )
         return {
             "status": "completed",
             "run_id": run_id,
+            "mode": mode,
             "won": len(won),
             "lost": len(lost),
+            "meta": meta,
             "suggestions": suggestions_out,
             "summary": summary,
         }
@@ -204,10 +244,26 @@ def apply_suggestion(suggestion_id: str, *, also_write_file: bool = False) -> di
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="ForceIA auto-melhoria assistida")
+    parser = argparse.ArgumentParser(
+        description="ForceIA auto-melhoria assistida (STaR + SPIN)"
+    )
     parser.add_argument("--workspace", type=str, help="Slug do workspace")
     parser.add_argument("--all", action="store_true", help="Todos os workspaces")
     parser.add_argument("--per-outcome", type=int, default=8)
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="hybrid",
+        choices=["hybrid", "spin", "star", "classic"],
+        help="hybrid=SPIN+STaR (padrao) | spin | star | classic",
+    )
+    parser.add_argument(
+        "--export-prefs",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Exporta dataset preferencia SPIN (JSON) para auditoria/treino",
+    )
     parser.add_argument("--list-pending", action="store_true")
     parser.add_argument("--approve", type=str, metavar="ID")
     parser.add_argument("--reject", type=str, metavar="ID")
@@ -261,8 +317,13 @@ def main() -> None:
         workspaces = [ws]
 
     for ws in workspaces:
-        print(f"\n=== Learning: {ws.slug} ===")
-        result = run_learning_for_workspace(ws, per_outcome=args.per_outcome)
+        print(f"\n=== Learning [{args.mode}]: {ws.slug} ===")
+        result = run_learning_for_workspace(
+            ws,
+            per_outcome=args.per_outcome,
+            mode=args.mode,
+            export_prefs_path=args.export_prefs,
+        )
         print(result)
 
 
