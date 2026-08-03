@@ -1,5 +1,5 @@
 """
-ForceIA - Runtime multi-tenant dos agentes.
+ForceIA - Runtime multi-tenant dos agentes (inteligencia + BANT + META).
 """
 
 from __future__ import annotations
@@ -8,23 +8,51 @@ import os
 from typing import Any
 
 import httpx
-from dotenv import load_dotenv
-from openai import OpenAI
-
 from db import (
     add_message,
     get_history,
     get_lead_by_phone,
     log_event,
+    mark_message_processed,
     merge_metadata,
     set_stage,
     upsert_lead,
 )
+from dotenv import load_dotenv
+from intelligence import (
+    apply_meta_to_lead_fields,
+    bant_score,
+    build_system_prompt,
+    is_bant_qualified,
+    split_reply_and_meta,
+    stage_from_meta_or_tags,
+)
+from logging_config import get_logger
+from openai import OpenAI
 from prompts import load_prompt
-from state_machine import detect_stage_from_reply, next_agent_for_stage
+from state_machine import can_transition, next_agent_for_stage
+from utils import strip_control_blocks
 from workspace_context import WorkspaceContext, resolve_workspace
 
 load_dotenv()
+
+log = get_logger("forceia.agent")
+
+_openai_clients: dict[str, OpenAI] = {}
+
+_AGENT_TEMPERATURE = {
+    "sdr": 0.65,
+    "closer": 0.45,
+    "followup": 0.7,
+}
+
+
+def _openai_client(api_key: str) -> OpenAI:
+    client = _openai_clients.get(api_key)
+    if client is None:
+        client = OpenAI(api_key=api_key)
+        _openai_clients[api_key] = client
+    return client
 
 
 def send_whatsapp(ws: WorkspaceContext, number: str, text: str) -> dict:
@@ -37,25 +65,55 @@ def send_whatsapp(ws: WorkspaceContext, number: str, text: str) -> dict:
         return r.json()
 
 
-def build_messages(agent: str, history: list[dict], user_message: str) -> list[dict]:
-    system = load_prompt(agent)
+def build_messages(
+    agent: str,
+    history: list[dict],
+    user_message: str,
+    *,
+    lead: dict,
+    workspace_name: str,
+    workspace_id: str | None = None,
+) -> list[dict]:
+    base = load_prompt(agent, workspace_id=workspace_id)
+    system = build_system_prompt(base, lead, workspace_name=workspace_name)
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
     for h in history:
         role = h.get("role")
         content = h.get("content")
         if role in ("user", "assistant") and content:
+            if role == "assistant":
+                content = strip_control_blocks(content)
             messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": user_message})
     return messages
 
 
-def generate_reply(ws: WorkspaceContext, agent: str, history: list[dict], user_message: str) -> str:
-    client = OpenAI(api_key=ws.openai_api_key)
-    messages = build_messages(agent, history, user_message)
+def generate_reply(
+    ws: WorkspaceContext,
+    agent: str,
+    history: list[dict],
+    user_message: str,
+    *,
+    lead: dict | None = None,
+) -> str:
+    """Gera resposta bruta do modelo (pode conter ---META---)."""
+    if not ws.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY nao configurada (workspace nem .env)")
+    client = _openai_client(ws.openai_api_key)
+    lead = lead or {"stage": "sdr", "bant": {}, "metadata": {}}
+    messages = build_messages(
+        agent,
+        history,
+        user_message,
+        lead=lead,
+        workspace_name=ws.name or "ForceIA",
+        workspace_id=ws.id,
+    )
     response = client.chat.completions.create(
         model=ws.gpt_model,
         messages=messages,
-        temperature=0.7,
+        temperature=_AGENT_TEMPERATURE.get(agent, 0.6),
+        max_tokens=700,
     )
     return response.choices[0].message.content or ""
 
@@ -86,51 +144,114 @@ def sync_twenty(ws: WorkspaceContext, lead: dict) -> None:
         )
 
 
+def _maybe_auto_qualify(stage: str, bant: dict | None, meta_stage: str) -> str:
+    """Se o modelo nao marcou qualified mas BANT esta forte, sugere qualified."""
+    if stage == "sdr" and is_bant_qualified(bant) and meta_stage == stage:
+        return "qualified"
+    return meta_stage
+
+
 def handle_incoming(
     number: str,
     text: str,
     *,
     workspace: WorkspaceContext,
     send: bool = True,
+    message_id: str | None = None,
 ) -> str:
     ws = workspace
     lead = get_lead_by_phone(ws.id, number)
     if not lead:
-        lead = upsert_lead(ws.id, number, stage="sdr")
+        lead = upsert_lead(ws.id, number, stage="sdr", bant={})
         log_event("lead_created", {"phone": number}, lead_id=lead["id"], workspace_id=ws.id)
+        log.info("lead criado", extra={"workspace": ws.slug, "phone": number})
         sync_twenty(ws, lead)
 
     stage = lead.get("stage") or "sdr"
-    agent = next_agent_for_stage(stage)
-    history_rows = get_history(lead["id"], limit=20)
+    if stage in ("won", "lost"):
+        agent = "closer" if stage == "won" else "sdr"
+    else:
+        agent = next_agent_for_stage(stage)
+
+    history_rows = get_history(lead["id"], limit=24)
     history = [{"role": r["role"], "content": r["content"]} for r in history_rows]
 
-    reply = generate_reply(ws, agent, history, text)
-    new_stage = detect_stage_from_reply(reply, stage)
+    raw_reply = generate_reply(ws, agent, history, text, lead=lead)
+    visible, meta = split_reply_and_meta(raw_reply)
+    reply = strip_control_blocks(visible)
+
+    field_updates = apply_meta_to_lead_fields(lead, meta, text)
+    new_stage = stage_from_meta_or_tags(raw_reply, meta, stage, can_transition)
+    new_stage = _maybe_auto_qualify(stage, field_updates.get("bant") or lead.get("bant"), new_stage)
+
+    if meta.get("handoff"):
+        log_event(
+            "handoff_requested",
+            {"phone": number, "reason": meta.get("intent") or meta.get("notes")},
+            lead_id=lead["id"],
+            workspace_id=ws.id,
+        )
+        if "vou te conectar" not in reply.lower() and "humano" not in reply.lower():
+            reply = (
+                (reply + "\n\n" if reply else "")
+                + "Vou acionar alguém do time para te atender em seguida, combinado?"
+            ).strip()
 
     add_message(lead["id"], "user", text)
     add_message(lead["id"], "assistant", reply, agent=agent)
+    if message_id:
+        mark_message_processed(ws.id, message_id, lead_id=lead["id"])
 
+    upsert_kwargs = {k: v for k, v in field_updates.items() if k != "metadata"}
+    if field_updates.get("metadata"):
+        merge_metadata(ws.id, number, field_updates["metadata"])
     if new_stage != stage:
+        upsert_kwargs["stage"] = new_stage
         lead = set_stage(ws.id, number, new_stage)
+        if upsert_kwargs:
+            other = {k: v for k, v in upsert_kwargs.items() if k != "stage"}
+            if other:
+                lead = upsert_lead(ws.id, number, **other)
         log_event(
             "stage_changed",
-            {"from": stage, "to": new_stage},
+            {
+                "from": stage,
+                "to": new_stage,
+                "bant_score": bant_score(field_updates.get("bant") or lead.get("bant")),
+            },
             lead_id=lead["id"],
             workspace_id=ws.id,
         )
         sync_twenty(ws, lead)
     else:
-        upsert_lead(ws.id, number)
-        meta = lead.get("metadata") or {}
-        if not meta.get("twenty_person_id"):
+        if upsert_kwargs:
+            lead = upsert_lead(ws.id, number, **upsert_kwargs)
+        else:
+            upsert_lead(ws.id, number)
+        meta_lead = lead.get("metadata") or {}
+        if not meta_lead.get("twenty_person_id"):
             lead = get_lead_by_phone(ws.id, number) or lead
             sync_twenty(ws, lead)
 
-    if send:
+    log.info(
+        "mensagem processada",
+        extra={
+            "workspace": ws.slug,
+            "phone": number,
+            "event": f"{stage}->{new_stage}",
+            "stage": new_stage,
+        },
+    )
+
+    if send and reply:
         try:
             send_whatsapp(ws, number, reply)
         except Exception as exc:
+            log.warning(
+                "falha ao enviar WhatsApp: %s",
+                exc,
+                extra={"workspace": ws.slug, "phone": number},
+            )
             log_event(
                 "whatsapp_send_error",
                 {"error": str(exc)},
@@ -142,13 +263,14 @@ def handle_incoming(
 
 
 if __name__ == "__main__":
-    print("ForceIA Agent multi-tenant - teste local")
+    print("ForceIA Agent multi-tenant - teste local (agentes inteligentes)")
     slug = os.getenv("DEFAULT_WORKSPACE_SLUG", "default")
     ws = resolve_workspace(slug=slug)
     if not ws:
         print(f"Workspace '{slug}' nao encontrado. Crie no Supabase (tabela workspaces).")
         raise SystemExit(1)
-    print(f"Workspace: {ws.name} ({ws.slug})\n")
+    print(f"Workspace: {ws.name} ({ws.slug})")
+    print("Digite mensagens como o lead. 'sair' encerra.\n")
     phone = "5511999999999"
     while True:
         user = input("Lead: ").strip()
