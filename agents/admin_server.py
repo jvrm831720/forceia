@@ -18,11 +18,17 @@ from pathlib import Path
 from db import (
     count_leads_by_stage,
     create_workspace,
+    get_prompt_suggestion,
     get_workspace_by_slug,
     list_active_workspaces,
     list_leads,
+    list_prompt_suggestions,
     list_recent_events,
+    update_prompt_suggestion,
+    upsert_prompt_override,
 )
+from learning import ensure_meta_protocol
+from datetime import UTC, datetime
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
@@ -34,7 +40,7 @@ load_dotenv()
 
 log = get_logger("forceia.admin")
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -152,6 +158,91 @@ async def api_events(slug: str, limit: int = 50):
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace nao encontrado")
     return list_recent_events(ws["id"], limit=limit)
+
+
+class ReviewIn(BaseModel):
+    note: str | None = None
+
+
+@app.get("/api/learning/suggestions", dependencies=[Depends(require_token)])
+async def api_list_suggestions(status: str = "pending", limit: int = 50):
+    return list_prompt_suggestions(status=status or None, limit=limit)
+
+
+@app.get("/api/learning/suggestions/{suggestion_id}", dependencies=[Depends(require_token)])
+async def api_get_suggestion(suggestion_id: str):
+    row = get_prompt_suggestion(suggestion_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Sugestao nao encontrada")
+    return row
+
+
+@app.post("/api/learning/suggestions/{suggestion_id}/approve", dependencies=[Depends(require_token)])
+async def api_approve(suggestion_id: str, body: ReviewIn | None = None):
+    row = get_prompt_suggestion(suggestion_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Sugestao nao encontrada")
+    return update_prompt_suggestion(
+        suggestion_id,
+        status="approved",
+        reviewed_at=datetime.now(UTC).isoformat(),
+        reviewed_note=(body.note if body else None),
+    )
+
+
+@app.post("/api/learning/suggestions/{suggestion_id}/reject", dependencies=[Depends(require_token)])
+async def api_reject(suggestion_id: str, body: ReviewIn | None = None):
+    row = get_prompt_suggestion(suggestion_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Sugestao nao encontrada")
+    return update_prompt_suggestion(
+        suggestion_id,
+        status="rejected",
+        reviewed_at=datetime.now(UTC).isoformat(),
+        reviewed_note=(body.note if body else None),
+    )
+
+
+@app.post("/api/learning/suggestions/{suggestion_id}/apply", dependencies=[Depends(require_token)])
+async def api_apply(suggestion_id: str):
+    """Aprova (se pending) e ativa override no banco."""
+    row = get_prompt_suggestion(suggestion_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Sugestao nao encontrada")
+    if row.get("status") == "pending":
+        update_prompt_suggestion(
+            suggestion_id,
+            status="approved",
+            reviewed_at=datetime.now(UTC).isoformat(),
+            reviewed_note="approved via admin apply",
+        )
+    content = ensure_meta_protocol(row["suggested_prompt"])
+    override = upsert_prompt_override(
+        row["agent"],
+        content,
+        workspace_id=row.get("workspace_id"),
+        source_suggestion_id=suggestion_id,
+    )
+    update_prompt_suggestion(
+        suggestion_id,
+        status="applied",
+        reviewed_at=datetime.now(UTC).isoformat(),
+    )
+    log.info("prompt applied", extra={"workspace": str(row.get("workspace_id")), "event": row["agent"]})
+    return {"ok": True, "override": override, "agent": row["agent"]}
+
+
+@app.post("/api/learning/run/{slug}", dependencies=[Depends(require_token)])
+async def api_run_learning(slug: str, per_outcome: int = 8):
+    """Dispara job de aprendizado para um workspace (sincrono)."""
+    from improve_agents import run_learning_for_workspace
+    from workspace_context import WorkspaceContext
+
+    ws_row = get_workspace_by_slug(slug)
+    if not ws_row:
+        raise HTTPException(status_code=404, detail="Workspace nao encontrado")
+    ws = WorkspaceContext.from_row(ws_row)
+    return run_learning_for_workspace(ws, per_outcome=per_outcome)
 
 
 if __name__ == "__main__":
