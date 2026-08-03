@@ -95,7 +95,9 @@ def generate_reply(
     user_message: str,
     *,
     lead: dict | None = None,
+    trace: Any = None,
 ) -> str:
+    """Gera resposta bruta do modelo (pode conter ---META---)."""
     if not ws.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY nao configurada (workspace nem .env)")
     client = _openai_client(ws.openai_api_key)
@@ -108,13 +110,49 @@ def generate_reply(
         workspace_name=ws.name or "ForceIA",
         workspace_id=ws.id,
     )
+    model = ws.gpt_model
+    temperature = _AGENT_TEMPERATURE.get(agent, 0.6)
+    lf_input = [
+        {"role": m["role"], "content": (m.get("content") or "")[:1500]}
+        for m in messages
+        if m.get("role") != "system"
+    ]
     response = client.chat.completions.create(
-        model=ws.gpt_model,
+        model=model,
         messages=messages,
-        temperature=_AGENT_TEMPERATURE.get(agent, 0.6),
+        temperature=temperature,
         max_tokens=700,
     )
-    return response.choices[0].message.content or ""
+    content = response.choices[0].message.content or ""
+    usage = None
+    try:
+        u = getattr(response, "usage", None)
+        if u:
+            usage = {
+                "input": getattr(u, "prompt_tokens", None),
+                "output": getattr(u, "completion_tokens", None),
+                "total": getattr(u, "total_tokens", None),
+            }
+    except Exception:
+        usage = None
+    if trace is not None:
+        try:
+            trace.generation(
+                name=f"openai.{agent}",
+                model=model,
+                input=lf_input,
+                output=content[:4000],
+                metadata={
+                    "agent": agent,
+                    "stage": (lead or {}).get("stage"),
+                    "temperature": temperature,
+                    "workspace": ws.slug,
+                },
+                usage=usage,
+            )
+        except Exception:
+            pass
+    return content
 
 
 def sync_twenty(ws: WorkspaceContext, lead: dict) -> None:
