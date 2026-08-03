@@ -152,7 +152,6 @@ def merge_metadata(workspace_id: str, phone: str, extra: dict) -> dict:
 # ---------- Idempotencia de mensagens ----------
 
 def was_message_processed(workspace_id: str, message_id: str) -> bool:
-    """Verifica se um message_id da Evolution ja foi processado (dedup de webhook)."""
     if not message_id:
         return False
     result = (
@@ -222,3 +221,172 @@ def list_recent_events(workspace_id: str, limit: int = 50) -> list[dict]:
         .execute()
     )
     return result.data or []
+
+
+# ---------- Learning / auto-melhoria ----------
+
+def list_leads_by_stage(workspace_id: str, stage: str, limit: int = 20) -> list[dict]:
+    result = (
+        get_client()
+        .table("leads")
+        .select("id, phone, name, company, stage, bant, metadata, updated_at")
+        .eq("workspace_id", workspace_id)
+        .eq("stage", stage)
+        .order("updated_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
+
+
+def get_messages_for_lead(lead_id: str, limit: int = 40) -> list[dict]:
+    result = (
+        get_client()
+        .table("messages")
+        .select("role, content, agent, created_at")
+        .eq("lead_id", lead_id)
+        .order("created_at", desc=False)
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
+
+
+def create_learning_run(workspace_id: str | None = None) -> dict:
+    row = {"status": "running", "workspace_id": workspace_id}
+    result = get_client().table("learning_runs").insert(row).execute()
+    return result.data[0] if result.data else row
+
+
+def finish_learning_run(
+    run_id: str,
+    *,
+    status: str,
+    won_sampled: int = 0,
+    lost_sampled: int = 0,
+    summary: str | None = None,
+    error: str | None = None,
+) -> None:
+    from datetime import UTC, datetime
+
+    get_client().table("learning_runs").update(
+        {
+            "status": status,
+            "won_sampled": won_sampled,
+            "lost_sampled": lost_sampled,
+            "summary": summary,
+            "error": error,
+            "finished_at": datetime.now(UTC).isoformat(),
+        }
+    ).eq("id", run_id).execute()
+
+
+def insert_prompt_suggestion(**fields) -> dict:
+    result = get_client().table("prompt_suggestions").insert(fields).execute()
+    return result.data[0] if result.data else fields
+
+
+def list_prompt_suggestions(
+    *,
+    status: str | None = "pending",
+    workspace_id: str | None = None,
+    limit: int = 50,
+) -> list[dict]:
+    q = get_client().table("prompt_suggestions").select("*")
+    if status:
+        q = q.eq("status", status)
+    if workspace_id:
+        q = q.eq("workspace_id", workspace_id)
+    result = q.order("created_at", desc=True).limit(limit).execute()
+    return result.data or []
+
+
+def get_prompt_suggestion(suggestion_id: str) -> dict | None:
+    result = (
+        get_client()
+        .table("prompt_suggestions")
+        .select("*")
+        .eq("id", suggestion_id)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
+
+def update_prompt_suggestion(suggestion_id: str, **fields) -> dict:
+    result = (
+        get_client()
+        .table("prompt_suggestions")
+        .update(fields)
+        .eq("id", suggestion_id)
+        .execute()
+    )
+    return result.data[0] if result.data else fields
+
+
+def upsert_prompt_override(
+    agent: str,
+    content: str,
+    *,
+    workspace_id: str | None = None,
+    source_suggestion_id: str | None = None,
+) -> dict:
+    client = get_client()
+    payload = {
+        "agent": agent,
+        "content": content,
+        "workspace_id": workspace_id,
+        "source_suggestion_id": source_suggestion_id,
+        "active": True,
+    }
+    if workspace_id:
+        result = (
+            client.table("agent_prompt_overrides")
+            .upsert(payload, on_conflict="workspace_id,agent")
+            .execute()
+        )
+    else:
+        existing = (
+            client.table("agent_prompt_overrides")
+            .select("id")
+            .is_("workspace_id", "null")
+            .eq("agent", agent)
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            result = (
+                client.table("agent_prompt_overrides")
+                .update(payload)
+                .eq("id", existing.data[0]["id"])
+                .execute()
+            )
+        else:
+            result = client.table("agent_prompt_overrides").insert(payload).execute()
+    return result.data[0] if result.data else payload
+
+
+def get_prompt_override(agent: str, workspace_id: str | None = None) -> str | None:
+    client = get_client()
+    if workspace_id:
+        result = (
+            client.table("agent_prompt_overrides")
+            .select("content")
+            .eq("workspace_id", workspace_id)
+            .eq("agent", agent)
+            .eq("active", True)
+            .limit(1)
+            .execute()
+        )
+        if result.data:
+            return result.data[0].get("content")
+    result = (
+        client.table("agent_prompt_overrides")
+        .select("content")
+        .is_("workspace_id", "null")
+        .eq("agent", agent)
+        .eq("active", True)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0]["content"] if result.data else None
