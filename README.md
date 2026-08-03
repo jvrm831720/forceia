@@ -13,9 +13,10 @@ https://github.com/jvrm831720/forceia
 | Camada | Tecnologia |
 |--------|------------|
 | WhatsApp | Evolution API |
-| Agentes | Python + OpenAI (prompts estilo SalesGPT) |
-| Estados | Maquina SDR → Qualified → Closer → Follow-up |
-| Banco | **Supabase** (Postgres) |
+| Agentes | Python + OpenAI |
+| Estados | SDR → Qualified → Closer → Follow-up |
+| Banco | Supabase |
+| Jobs | Follow-up automatico (cron / scheduler) |
 | CRM (fase 2) | Twenty |
 | Integracoes (fase 2) | Composio |
 
@@ -25,31 +26,39 @@ https://github.com/jvrm831720/forceia
 git clone https://github.com/jvrm831720/forceia.git
 cd forceia
 cp .env.example .env
-# Preencha OPENAI_API_KEY + SUPABASE_* 
+# OPENAI_API_KEY + SUPABASE_*
 
-# 1) Schema no Supabase (SQL Editor)
-#    cole o conteudo de supabase/schema.sql
+# Schema: cole supabase/schema.sql no SQL Editor do Supabase
 
-# 2) WhatsApp (opcional no primeiro teste)
-docker compose up -d
+docker compose up -d   # Evolution API
 
-# 3) Agente
 cd agents
 pip install -r requirements.txt
-python run_sdr.py
+python run_sdr.py              # teste dialogo
+python webhook_server.py       # producao WhatsApp
+python followup_job.py --dry-run
 ```
 
 Docs:
 - [Setup](docs/SETUP.md)
 - [Supabase](docs/SUPABASE.md)
+- [Follow-up jobs](docs/FOLLOWUP.md)
 - [Arquitetura](docs/ARCHITECTURE.md)
 
-## Estagios do lead
+## Estagios
 
-`sdr` → `qualified` → `closer` → `won` / `lost`  
-(com desvio para `followup`)
+`sdr` → `qualified` → `closer` → `won` / `lost` (+ `followup`)
 
-Tags na resposta do agente disparam a troca de estagio: `[QUALIFICADO]`, `[FECHADO]`, `[PERDIDO]`, `[FOLLOWUP]`.
+Tags: `[QUALIFICADO]`, `[FECHADO]`, `[PERDIDO]`, `[FOLLOWUP]`
+
+## Follow-up automatico
+
+Leads sem resposta ha N dias recebem mensagem do agente Follow-up.
+
+```bash
+python followup_job.py --days 5
+python scheduler.py --hours 6
+```
 
 ## Precos (produto)
 

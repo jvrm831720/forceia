@@ -22,6 +22,10 @@ Para WhatsApp:
 - `EVOLUTION_API_KEY`
 - `EVOLUTION_INSTANCE`
 
+Follow-up (opcional):
+- `FOLLOWUP_STALE_DAYS=5`
+- `FOLLOWUP_MIN_HOURS=48`
+
 ## 3. Evolution API (WhatsApp)
 
 ```bash
@@ -48,10 +52,26 @@ Teste so o dialogo (sem WhatsApp):
 python run_sdr.py
 ```
 
-## 5. Fluxo esperado
+## 5. Job de Follow-up
+
+```bash
+# Simular
+python followup_job.py --dry-run
+
+# Enviar de verdade
+python followup_job.py --days 5
+
+# Loop a cada 6h
+python scheduler.py --hours 6 --days 5
+```
+
+Detalhes em `docs/FOLLOWUP.md`.
+
+## 6. Fluxo esperado
 
 1. Lead manda WhatsApp
 2. Evolution → webhook ForceIA
 3. Lead criado/atualizado no Supabase (`stage=sdr`)
 4. Agente SDR responde
-5. Se a resposta tiver `[QUALIFICADO]`, stage vira `qualified` e o Closer assume nas proximas mensagens
+5. Se a resposta tiver `[QUALIFICADO]`, stage vira `qualified` e o Closer assume
+6. Se o lead ficar X dias sem responder, o **followup_job** reativa automaticamente
