@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 
-def normalize_phone(phone: str) -> str:
+def normalize_phone(phone: str | None) -> str:
     """Mantem apenas digitos do telefone."""
     return "".join(c for c in (phone or "") if c.isdigit())
 
@@ -24,3 +24,10 @@ def strip_stage_tags(text: str) -> str:
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
     cleaned = re.sub(r" *\n *", "\n", cleaned)
     return cleaned.strip()
+
+
+def env_flag(value: str | None, default: bool = False) -> bool:
+    """Interpreta strings de env como boolean."""
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "sim", "on"}

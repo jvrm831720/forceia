@@ -1,0 +1,28 @@
+[project]
+name = "forceia"
+version = "1.0.0"
+description = "Time de vendas de IA multi-tenant: WhatsApp + SDR/Closer/Follow-up + Supabase + Twenty"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["static"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+  "E501",  # linhas longas toleradas (prompts, urls)
+  "B008",  # Depends() em defaults de FastAPI e idiomatico
+]
+
+[tool.ruff.lint.per-file-ignores]
+"agents/tests/*" = ["E402"]       # imports apos ajuste de sys.path
+"agents/validate_mvp.py" = ["E402"]  # dotenv carregado apos sys.path
+
+[tool.pytest.ini_options]
+testpaths = ["agents/tests"]
+pythonpath = ["agents"]
+addopts = "-q"
