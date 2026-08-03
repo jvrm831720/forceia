@@ -1,4 +1,13 @@
-"""Carrega prompts dos agentes."""
+"""Carrega prompts dos agentes.
+
+Ordem de precedencia:
+1. Override ativo no Supabase (por workspace, se informado)
+2. Override global no Supabase
+3. Arquivo config/prompts/{agent}.md
+4. DEFAULTS embutido
+"""
+
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -6,46 +15,37 @@ ROOT = Path(__file__).resolve().parent.parent
 PROMPTS_DIR = ROOT / "config" / "prompts"
 
 DEFAULTS = {
-    "sdr": """Voce e o SDR da ForceIA, um time de vendas de IA.
-
-Objetivo:
-1. Qualificar o lead com BANT (Budget, Authority, Need, Timeline)
-2. Entender a dor e o interesse
-3. Quando qualificado, oferecer agenda de reuniao
-
-Regras:
-- Portugues brasileiro, tom profissional e amigavel
-- No maximo 2-3 perguntas por mensagem
-- Nao seja insistente
-- Se pedir humano, confirme que sera transferido
-
-Quando o lead estiver qualificado, inclua a tag [QUALIFICADO] na resposta e sugira horarios.
-""",
-    "closer": """Voce e o Closer da ForceIA.
-
-Objetivo: avanccar o fechamento apos qualificacao ou reuniao.
-- Tire objecoes
-- Reforce valor e ROI
-- Confirme proximos passos
-- Se fechou, use a tag [FECHADO]
-- Se perdeu, use [PERDIDO]
-
-Portugues brasileiro, consultivo e direto.
-""",
-    "followup": """Voce e o agente de Follow-up da ForceIA.
-
-Objetivo: reativar leads frios com mensagem curta e de valor.
-- Nao so pergunte "ainda interessado?"
-- Ofereca algo util (case, horario flexivel, material)
-- Se o lead voltar engajado, use [QUALIFICADO] ou continue o dialogo
-
-Portugues brasileiro, educado e objetivo.
-""",
+    "sdr": (
+        "Voce e o SDR da ForceIA no WhatsApp (Brasil B2B). "
+        "Qualifique com BANT, no maximo 1-2 perguntas por mensagem. "
+        "Termine com bloco ---META---."
+    ),
+    "closer": (
+        "Voce e o Closer da ForceIA. Avance o fechamento e trate objecoes. "
+        "Termine com bloco ---META---."
+    ),
+    "followup": (
+        "Voce reativa leads frios com mensagem curta e de valor. "
+        "Termine com bloco ---META---."
+    ),
 }
 
 
-def load_prompt(agent: str) -> str:
+def load_prompt_from_file(agent: str) -> str:
     path = PROMPTS_DIR / f"{agent}.md"
     if path.exists():
         return path.read_text(encoding="utf-8")
     return DEFAULTS.get(agent, DEFAULTS["sdr"])
+
+
+def load_prompt(agent: str, workspace_id: str | None = None) -> str:
+    """Carrega prompt com overrides do ciclo de aprendizado."""
+    try:
+        from db import get_prompt_override
+
+        overridden = get_prompt_override(agent, workspace_id=workspace_id)
+        if overridden and len(overridden.strip()) > 40:
+            return overridden
+    except Exception:
+        pass
+    return load_prompt_from_file(agent)
