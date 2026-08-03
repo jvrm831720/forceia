@@ -1,55 +1,44 @@
 # ForceIA
 
-**Seu time de vendas de IA que trabalha 24h por menos de 30% do custo de um SDR humano.**
+**Time de vendas de IA multi-tenant** — um workspace por cliente.
 
-Time de agentes (SDR + Closer + Follow-up) no WhatsApp, com **Supabase** + **Twenty CRM**.
+WhatsApp (Evolution) + Agentes (SDR/Closer/Follow-up) + Supabase + Twenty CRM.
 
 ## Repo
 
 https://github.com/jvrm831720/forceia
 
-## Stack
+## Multi-tenant
 
-| Camada | Tecnologia |
-|--------|------------|
-| WhatsApp | Evolution API |
-| Agentes | Python + OpenAI |
-| Estados | SDR → Qualified → Closer → Follow-up |
-| Banco | Supabase |
-| CRM | Twenty (People + Opportunities) |
-| Jobs | Follow-up + sync Twenty |
+Cada cliente ForceIA = 1 linha em `workspaces`:
+- Instancia WhatsApp propria
+- Leads isolados
+- Credenciais Twenty/OpenAI opcionais por tenant
+- Follow-up e sync por workspace ou `--all`
+
+```bash
+python create_workspace.py --name "Cliente X" --slug cliente-x
+python followup_job.py --workspace cliente-x
+python sync_twenty_job.py --all
+```
 
 ## Quick Start
 
 ```bash
 git clone https://github.com/jvrm831720/forceia.git
-cd forceia
-cp .env.example .env
-# OPENAI_API_KEY, SUPABASE_*, TWENTY_*
-
-# Schema Supabase: supabase/schema.sql
-docker compose up -d
+cd forceia && cp .env.example .env
+# SUPABASE_* + OPENAI_API_KEY
+# Rode supabase/schema.sql
 
 cd agents && pip install -r requirements.txt
+python create_workspace.py --name Default --slug default --instance forceia
 python run_sdr.py
 python webhook_server.py
-python followup_job.py --dry-run
-python sync_twenty_job.py --dry-run
 ```
 
-Docs:
-- [Setup](docs/SETUP.md)
-- [Supabase](docs/SUPABASE.md)
-- [Twenty CRM](docs/TWENTY.md)
-- [Follow-up](docs/FOLLOWUP.md)
+Docs: [Setup](docs/SETUP.md) · [Multi-tenant](docs/MULTI_TENANT.md) · [Supabase](docs/SUPABASE.md) · [Twenty](docs/TWENTY.md) · [Follow-up](docs/FOLLOWUP.md)
 
-## Sync Twenty
-
-- Novo lead / mudanca de stage → sync automatico
-- `python sync_twenty_job.py` → lote
-- IDs em `leads.metadata.twenty_person_id` / `twenty_opportunity_id`
-
-## Precos (produto)
+## Precos
 
 | Plano | Mensal |
 |-------|--------|
@@ -60,5 +49,4 @@ Docs:
 Setup: R$ 5.900
 
 ---
-
 ForceIA - A forca de vendas que nunca dorme.

@@ -1,4 +1,4 @@
-"""ForceIA - Cliente Supabase para leads e mensagens."""
+"""ForceIA - Cliente Supabase multi-tenant."""
 
 from __future__ import annotations
 
@@ -26,44 +26,96 @@ def get_client() -> Client:
     return _client
 
 
-def upsert_lead(phone: str, **fields: Any) -> dict:
-    client = get_client()
-    payload = {"phone": phone, **{k: v for k, v in fields.items() if v is not None}}
-    payload["last_message_at"] = datetime.now(timezone.utc).isoformat()
-    result = (
-        client.table("leads")
-        .upsert(payload, on_conflict="phone")
-        .execute()
-    )
-    return result.data[0] if result.data else payload
+# ---------- Workspaces ----------
 
-
-def get_lead_by_phone(phone: str) -> dict | None:
-    client = get_client()
-    result = client.table("leads").select("*").eq("phone", phone).limit(1).execute()
+def get_workspace_by_id(workspace_id: str) -> dict | None:
+    result = get_client().table("workspaces").select("*").eq("id", workspace_id).limit(1).execute()
     return result.data[0] if result.data else None
 
 
-def set_stage(phone: str, stage: str) -> dict:
-    return upsert_lead(phone, stage=stage)
+def get_workspace_by_slug(slug: str) -> dict | None:
+    result = get_client().table("workspaces").select("*").eq("slug", slug).eq("active", True).limit(1).execute()
+    return result.data[0] if result.data else None
+
+
+def get_workspace_by_api_key(api_key: str) -> dict | None:
+    result = (
+        get_client()
+        .table("workspaces")
+        .select("*")
+        .eq("api_key", api_key)
+        .eq("active", True)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
+
+def get_workspace_by_evolution_instance(instance: str) -> dict | None:
+    result = (
+        get_client()
+        .table("workspaces")
+        .select("*")
+        .eq("evolution_instance", instance)
+        .eq("active", True)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
+
+def list_active_workspaces() -> list[dict]:
+    result = get_client().table("workspaces").select("*").eq("active", True).execute()
+    return result.data or []
+
+
+def create_workspace(name: str, slug: str, **fields: Any) -> dict:
+    payload = {"name": name, "slug": slug, **{k: v for k, v in fields.items() if v is not None}}
+    result = get_client().table("workspaces").insert(payload).execute()
+    return result.data[0] if result.data else payload
+
+
+# ---------- Leads ----------
+
+def upsert_lead(workspace_id: str, phone: str, **fields: Any) -> dict:
+    client = get_client()
+    payload = {
+        "workspace_id": workspace_id,
+        "phone": phone,
+        **{k: v for k, v in fields.items() if v is not None},
+    }
+    payload["last_message_at"] = datetime.now(timezone.utc).isoformat()
+    result = client.table("leads").upsert(payload, on_conflict="workspace_id,phone").execute()
+    return result.data[0] if result.data else payload
+
+
+def get_lead_by_phone(workspace_id: str, phone: str) -> dict | None:
+    result = (
+        get_client()
+        .table("leads")
+        .select("*")
+        .eq("workspace_id", workspace_id)
+        .eq("phone", phone)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
+
+def set_stage(workspace_id: str, phone: str, stage: str) -> dict:
+    return upsert_lead(workspace_id, phone, stage=stage)
 
 
 def add_message(lead_id: str, role: str, content: str, agent: str | None = None) -> dict:
-    client = get_client()
-    row = {
-        "lead_id": lead_id,
-        "role": role,
-        "content": content,
-        "agent": agent,
-    }
-    result = client.table("messages").insert(row).execute()
+    row = {"lead_id": lead_id, "role": role, "content": content, "agent": agent}
+    result = get_client().table("messages").insert(row).execute()
     return result.data[0] if result.data else row
 
 
 def get_history(lead_id: str, limit: int = 20) -> list[dict]:
-    client = get_client()
     result = (
-        client.table("messages")
+        get_client()
+        .table("messages")
         .select("role, content, agent, created_at")
         .eq("lead_id", lead_id)
         .order("created_at", desc=False)
@@ -73,20 +125,24 @@ def get_history(lead_id: str, limit: int = 20) -> list[dict]:
     return result.data or []
 
 
-def log_event(lead_id: str | None, event_type: str, payload: dict | None = None) -> None:
-    client = get_client()
-    client.table("events").insert(
+def log_event(
+    event_type: str,
+    payload: dict | None = None,
+    lead_id: str | None = None,
+    workspace_id: str | None = None,
+) -> None:
+    get_client().table("events").insert(
         {
-            "lead_id": lead_id,
             "type": event_type,
             "payload": payload or {},
+            "lead_id": lead_id,
+            "workspace_id": workspace_id,
         }
     ).execute()
 
 
-def merge_metadata(phone: str, extra: dict) -> dict:
-    """Mescla campos em metadata (ex: twenty_person_id)."""
-    lead = get_lead_by_phone(phone) or {}
+def merge_metadata(workspace_id: str, phone: str, extra: dict) -> dict:
+    lead = get_lead_by_phone(workspace_id, phone) or {}
     meta = dict(lead.get("metadata") or {})
     meta.update(extra)
-    return upsert_lead(phone, metadata=meta)
+    return upsert_lead(workspace_id, phone, metadata=meta)

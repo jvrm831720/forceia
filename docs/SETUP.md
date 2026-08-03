@@ -1,61 +1,48 @@
-# Setup ForceIA MVP (Supabase + Twenty)
+# Setup ForceIA (multi-tenant)
 
 ## 1. Supabase
 
-Siga `docs/SUPABASE.md`:
-1. Crie o projeto
-2. Rode `supabase/schema.sql`
-3. Preencha `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` no `.env`
+**Instalacao nova:** rode `supabase/schema.sql`  
+**Ja tinha schema antigo:** rode `supabase/migrate_multitenant.sql`
 
-## 2. Twenty CRM
+Crie o workspace inicial:
 
-Siga `docs/TWENTY.md`:
-1. Suba o Twenty (Docker ou Cloud)
-2. Gere API Key
-3. Preencha `TWENTY_API_URL` e `TWENTY_API_KEY`
-4. Ajuste `TWENTY_STAGE_*` se o pipeline do seu workspace for diferente
+```bash
+cd agents
+pip install -r requirements.txt
+python create_workspace.py --name "Default" --slug default --instance forceia
+```
 
-## 3. Variaveis
+## 2. .env
 
 ```bash
 cp .env.example .env
 ```
 
-Obrigatorio:
-- `OPENAI_API_KEY`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+Preencha Supabase + OpenAI. Opcional: Twenty e Evolution globais (fallback).
 
-WhatsApp:
-- `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE`
+```env
+DEFAULT_WORKSPACE_SLUG=default
+```
 
-CRM:
-- `TWENTY_API_URL` / `TWENTY_API_KEY`
-
-## 4. Evolution API
+## 3. Evolution + Webhook
 
 ```bash
 docker compose up -d
+python webhook_server.py
 ```
 
-Webhook → `https://SEU_TUNEL/webhook/evolution`
+Webhook por instancia:
+`https://SEU_HOST/webhook/evolution?instance=forceia`
 
-## 5. Agentes
+ou header `X-Workspace-Key`.
+
+## 4. Novo cliente (tenant)
 
 ```bash
-cd agents
-pip install -r requirements.txt
-python webhook_server.py
-python run_sdr.py
-python followup_job.py --dry-run
-python sync_twenty_job.py --dry-run
+python create_workspace.py --name "Clinica Sol" --slug clinica-sol --instance clinica-sol-wa
+# criar instancia Evolution com mesmo nome
+# apontar webhook da instancia
 ```
 
-## 6. Fluxo completo
-
-1. Lead manda WhatsApp
-2. Webhook → agente (SDR/Closer/Follow-up)
-3. Supabase grava lead + mensagens
-4. Twenty recebe Person + Opportunity (stage espelhado)
-5. Job de follow-up reativa parados
-6. Job `sync_twenty_job` pode reconciliar em lote
+Ver `docs/MULTI_TENANT.md`.
