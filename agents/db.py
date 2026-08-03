@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from dotenv import load_dotenv
+
 from supabase import Client, create_client
 
 load_dotenv()
@@ -84,7 +85,7 @@ def upsert_lead(workspace_id: str, phone: str, **fields: Any) -> dict:
         "phone": phone,
         **{k: v for k, v in fields.items() if v is not None},
     }
-    payload["last_message_at"] = datetime.now(timezone.utc).isoformat()
+    payload["last_message_at"] = datetime.now(UTC).isoformat()
     result = client.table("leads").upsert(payload, on_conflict="workspace_id,phone").execute()
     return result.data[0] if result.data else payload
 
@@ -146,3 +147,78 @@ def merge_metadata(workspace_id: str, phone: str, extra: dict) -> dict:
     meta = dict(lead.get("metadata") or {})
     meta.update(extra)
     return upsert_lead(workspace_id, phone, metadata=meta)
+
+
+# ---------- Idempotencia de mensagens ----------
+
+def was_message_processed(workspace_id: str, message_id: str) -> bool:
+    """Verifica se um message_id da Evolution ja foi processado (dedup de webhook)."""
+    if not message_id:
+        return False
+    result = (
+        get_client()
+        .table("events")
+        .select("id")
+        .eq("type", "message_processed")
+        .eq("workspace_id", workspace_id)
+        .contains("payload", {"message_id": message_id})
+        .limit(1)
+        .execute()
+    )
+    return bool(result.data)
+
+
+def mark_message_processed(
+    workspace_id: str, message_id: str, lead_id: str | None = None
+) -> None:
+    if not message_id:
+        return
+    log_event(
+        "message_processed",
+        {"message_id": message_id},
+        lead_id=lead_id,
+        workspace_id=workspace_id,
+    )
+
+
+# ---------- Consultas para o painel admin ----------
+
+def count_leads_by_stage(workspace_id: str) -> dict[str, int]:
+    result = (
+        get_client()
+        .table("leads")
+        .select("stage")
+        .eq("workspace_id", workspace_id)
+        .execute()
+    )
+    counts: dict[str, int] = {}
+    for row in result.data or []:
+        stage = row.get("stage") or "sdr"
+        counts[stage] = counts.get(stage, 0) + 1
+    return counts
+
+
+def list_leads(workspace_id: str, limit: int = 100) -> list[dict]:
+    result = (
+        get_client()
+        .table("leads")
+        .select("id, phone, name, company, stage, last_message_at, updated_at, metadata")
+        .eq("workspace_id", workspace_id)
+        .order("updated_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
+
+
+def list_recent_events(workspace_id: str, limit: int = 50) -> list[dict]:
+    result = (
+        get_client()
+        .table("events")
+        .select("type, payload, lead_id, created_at")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
