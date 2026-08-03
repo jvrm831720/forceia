@@ -17,3 +17,6 @@ supabase>=2.4.0
 # Orquestracao de agentes (grafo + checkpoints + retries)
 langgraph>=0.2.0
 langchain-core>=0.2.0
+
+# Observabilidade (traces LLM / decisoes)
+langfuse>=2.0.0
