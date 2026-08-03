@@ -1,4 +1,4 @@
-# Supabase - ForceIA
+# Supabase - ForceIA (multi-tenant)
 
 ## 1. Criar projeto
 
@@ -9,44 +9,53 @@
 
 ## 2. Criar tabelas
 
-No **SQL Editor**, rode o arquivo:
+**Instalacao nova** — SQL Editor:
 
 ```
 supabase/schema.sql
 ```
 
-Isso cria:
-- `leads` (phone, stage, bant, ...)
-- `messages` (historico)
-- `events` (auditoria)
+Cria:
+- `workspaces` (clientes ForceIA)
+- `leads` (por workspace)
+- `messages`
+- `events`
 
-## 3. Configurar .env
+**Ja tinha schema antigo:**
+
+```
+supabase/migrate_multitenant.sql
+```
+
+## 3. Workspace inicial
+
+```bash
+cd agents
+python create_workspace.py --name "Default" --slug default --instance forceia
+```
+
+## 4. .env
 
 ```env
 SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
+DEFAULT_WORKSPACE_SLUG=default
 ```
 
-Use a **service_role** no servidor dos agentes (webhook). Nao exponha no frontend.
-
-## 4. Estagios (stage)
+## 5. Estagios
 
 | stage | Agente |
 |-------|--------|
 | sdr | SDR |
-| qualified | Closer |
-| closer | Closer |
+| qualified / closer | Closer |
 | followup | Follow-up |
 | won / lost | terminal |
 
-Transicoes automaticas via tags na resposta: `[QUALIFICADO]`, `[FECHADO]`, `[PERDIDO]`, `[FOLLOWUP]`.
+Tags: `[QUALIFICADO]`, `[FECHADO]`, `[PERDIDO]`, `[FOLLOWUP]`
 
-## 5. Teste
+## 6. Validar
 
 ```bash
-cd agents
-pip install -r requirements.txt
+python validate_mvp.py
 python run_sdr.py
 ```
-
-As mensagens devem aparecer nas tabelas `leads` e `messages` no Supabase.

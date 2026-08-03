@@ -1,11 +1,18 @@
 # Setup ForceIA (multi-tenant)
 
+## Checklist de validacao
+
+1. Schema Supabase (`schema.sql` ou `migrate_multitenant.sql`)
+2. `.env` com Supabase + OpenAI
+3. Workspace `default` criado
+4. `python validate_mvp.py` sem FAIL
+5. `python run_sdr.py` responde no terminal
+6. (Opcional) Evolution + webhook WhatsApp
+7. (Opcional) Twenty API key
+
 ## 1. Supabase
 
-**Instalacao nova:** rode `supabase/schema.sql`  
-**Ja tinha schema antigo:** rode `supabase/migrate_multitenant.sql`
-
-Crie o workspace inicial:
+Rode `supabase/schema.sql` e depois:
 
 ```bash
 cd agents
@@ -17,32 +24,49 @@ python create_workspace.py --name "Default" --slug default --instance forceia
 
 ```bash
 cp .env.example .env
+# SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY
+# DEFAULT_WORKSPACE_SLUG=default
 ```
 
-Preencha Supabase + OpenAI. Opcional: Twenty e Evolution globais (fallback).
+Coloque o `.env` na **raiz** do repo (nao so em agents/).
 
-```env
-DEFAULT_WORKSPACE_SLUG=default
-```
-
-## 3. Evolution + Webhook
+## 3. Validar codigo + banco
 
 ```bash
+cd agents
+python validate_mvp.py
+```
+
+## 4. Teste de dialogo (sem WhatsApp)
+
+```bash
+python run_sdr.py
+```
+
+## 5. Evolution (WhatsApp)
+
+```bash
+# na raiz
 docker compose up -d
-python webhook_server.py
 ```
 
-Webhook por instancia:
-`https://SEU_HOST/webhook/evolution?instance=forceia`
+1. http://localhost:8080 — crie instancia `forceia` (mesmo nome do workspace)
+2. QR Code
+3. Webhook: `https://SEU_TUNEL/webhook/evolution?instance=forceia`
+4. `python webhook_server.py`
 
-ou header `X-Workspace-Key`.
+**Nota:** o Postgres do compose cria o DB `evolution` no primeiro start (arquivo `docker/init-evolution-db.sql`). Se o volume ja existia sem esse DB, crie manualmente:
 
-## 4. Novo cliente (tenant)
+```sql
+CREATE DATABASE evolution;
+```
+
+## 6. Jobs
 
 ```bash
-python create_workspace.py --name "Clinica Sol" --slug clinica-sol --instance clinica-sol-wa
-# criar instancia Evolution com mesmo nome
-# apontar webhook da instancia
+python followup_job.py --dry-run
+python scheduler.py --once --all
+python sync_twenty_job.py --dry-run
 ```
 
-Ver `docs/MULTI_TENANT.md`.
+Docs: [Multi-tenant](MULTI_TENANT.md) · [Supabase](SUPABASE.md) · [Twenty](TWENTY.md) · [Follow-up](FOLLOWUP.md)
