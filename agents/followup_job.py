@@ -1,5 +1,5 @@
 """
-ForceIA - Job de Follow-up multi-tenant
+ForceIA - Job de Follow-up multi-tenant (contexto BANT inteligente)
 
   python followup_job.py
   python followup_job.py --workspace demo
@@ -10,12 +10,21 @@ from __future__ import annotations
 
 import argparse
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
+from db import (
+    add_message,
+    get_client,
+    get_history,
+    list_active_workspaces,
+    log_event,
+    set_stage,
+    upsert_lead,
+)
 from dotenv import load_dotenv
-
-from db import add_message, get_client, get_history, list_active_workspaces, log_event, set_stage, upsert_lead
+from intelligence import bant_score, split_reply_and_meta
 from run_sdr import generate_reply, send_whatsapp
+from utils import strip_control_blocks
 from workspace_context import WorkspaceContext, resolve_workspace
 
 load_dotenv()
@@ -24,11 +33,13 @@ ELIGIBLE_STAGES = ("sdr", "qualified", "closer", "followup")
 
 
 def list_stale_leads(workspace_id: str, days: int, limit: int = 50) -> list[dict]:
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     result = (
         get_client()
         .table("leads")
-        .select("id, phone, name, company, stage, last_message_at, metadata, workspace_id")
+        .select(
+            "id, phone, name, company, stage, last_message_at, metadata, workspace_id, bant"
+        )
         .eq("workspace_id", workspace_id)
         .in_("stage", list(ELIGIBLE_STAGES))
         .lt("last_message_at", cutoff)
@@ -40,7 +51,7 @@ def list_stale_leads(workspace_id: str, days: int, limit: int = 50) -> list[dict
 
 
 def recent_followup_event(lead_id: str, hours: int) -> bool:
-    since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+    since = (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
     result = (
         get_client()
         .table("events")
@@ -54,18 +65,28 @@ def recent_followup_event(lead_id: str, hours: int) -> bool:
     return bool(result.data)
 
 
-def build_followup_context(lead: dict) -> str:
+def build_followup_context(lead: dict, history: list[dict]) -> str:
+    """Pedido interno ao modelo com memoria rica do lead."""
+    bant = lead.get("bant") or {}
     parts = [
-        "Contexto interno (nao repetir literalmente ao lead):",
-        f"- Estagio atual: {lead.get('stage') or 'sdr'}",
+        "Gere UMA mensagem curta de follow-up no WhatsApp (2-4 linhas).",
+        "Nao diga apenas 'ainda tem interesse?'. Use o contexto abaixo.",
+        f"Estagio: {lead.get('stage') or 'sdr'}",
     ]
     if lead.get("name"):
-        parts.append(f"- Nome: {lead['name']}")
+        parts.append(f"Nome: {lead['name']}")
     if lead.get("company"):
-        parts.append(f"- Empresa: {lead['company']}")
+        parts.append(f"Empresa: {lead['company']}")
+    if bant:
+        parts.append(f"BANT: {bant} (score={bant_score(bant)})")
+    user_bits = [h["content"] for h in history if h.get("role") == "user"][-3:]
+    if user_bits:
+        parts.append("Ultimas mensagens do lead:")
+        for bit in user_bits:
+            parts.append(f"  - {bit[:200]}")
     parts.append(
-        "Gere UMA mensagem curta de follow-up no WhatsApp para reengajar. "
-        "Ofereca valor ou um proximo passo claro."
+        "Lembre a dor ou o tema em 1 linha e proponha 1 proximo passo claro. "
+        "Inclua o bloco ---META--- no final conforme o protocolo."
     )
     return "\n".join(parts)
 
@@ -76,11 +97,24 @@ def process_lead(ws: WorkspaceContext, lead: dict, dry_run: bool = False) -> dic
     stage = lead.get("stage") or "sdr"
 
     if recent_followup_event(lead_id, ws.followup_min_hours):
-        return {"phone": phone, "workspace": ws.slug, "status": "skipped", "reason": "followup_recente"}
+        return {
+            "phone": phone,
+            "workspace": ws.slug,
+            "status": "skipped",
+            "reason": "followup_recente",
+        }
 
-    history_rows = get_history(lead_id, limit=12)
+    history_rows = get_history(lead_id, limit=16)
     history = [{"role": r["role"], "content": r["content"]} for r in history_rows]
-    reply = generate_reply(ws, "followup", history, build_followup_context(lead))
+    raw = generate_reply(
+        ws,
+        "followup",
+        history,
+        build_followup_context(lead, history),
+        lead=lead,
+    )
+    visible, _meta = split_reply_and_meta(raw)
+    reply = strip_control_blocks(visible)
 
     if dry_run:
         return {"phone": phone, "workspace": ws.slug, "status": "dry_run", "reply": reply}
@@ -102,7 +136,12 @@ def process_lead(ws: WorkspaceContext, lead: dict, dry_run: bool = False) -> dic
         log_event("followup_sent", {"phone": phone}, lead_id=lead_id, workspace_id=ws.id)
         return {"phone": phone, "workspace": ws.slug, "status": "sent"}
     except Exception as exc:
-        log_event("followup_send_error", {"error": str(exc)}, lead_id=lead_id, workspace_id=ws.id)
+        log_event(
+            "followup_send_error",
+            {"error": str(exc)},
+            lead_id=lead_id,
+            workspace_id=ws.id,
+        )
         return {"phone": phone, "workspace": ws.slug, "status": "error", "error": str(exc)}
 
 
