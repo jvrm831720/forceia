@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ForceIA · Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0B0F1A;
+    --panel: #121826;
+    --panel-2: #0E1420;
+    --line: #1F2A3D;
+    --ink: #E6ECF5;
+    --muted: #7C8BA6;
+    --signal: #FFB020;
+    --sdr: #5B8DEF;
+    --qualified: #38BDF8;
+    --closer: #A78BFA;
+    --followup: #FFB020;
+    --won: #4ADE80;
+    --lost: #F0708A;
+    --display: "Space Grotesk", system-ui, sans-serif;
+    --body: "Inter", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(91,141,239,0.08), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(255,176,32,0.06), transparent 55%),
+      var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    -webkit-font-smoothing: antialiased;
+    display: grid;
+    grid-template-columns: 264px 1fr;
+    min-height: 100vh;
+  }
+  a { color: inherit; }
+  button { font-family: var(--body); cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 6px; }
+  .rail {
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border-right: 1px solid var(--line);
+    padding: 26px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .brand .mark {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--signal), #ff7a45);
+    display: grid; place-items: center;
+    font-family: var(--display); font-weight: 700; color: #10141d;
+    box-shadow: 0 0 22px rgba(255,176,32,0.35);
+  }
+  .brand .name { font-family: var(--display); font-weight: 700; font-size: 19px; letter-spacing: -0.02em; }
+  .brand .name b { color: var(--signal); }
+  .status { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--won); box-shadow: 0 0 0 0 rgba(74,222,128,0.6); animation: pulse 2.4s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(74,222,128,0.55);} 70% { box-shadow: 0 0 0 9px rgba(74,222,128,0);} 100% { box-shadow: 0 0 0 0 rgba(74,222,128,0);} }
+  @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
+  .rail .label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .ws-list { display: flex; flex-direction: column; gap: 4px; }
+  .ws-item {
+    text-align: left; width: 100%;
+    background: transparent; border: 1px solid transparent; color: var(--ink);
+    padding: 9px 11px; border-radius: 9px; font-size: 14px; font-weight: 500;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  .ws-item:hover { background: rgba(255,255,255,0.03); }
+  .ws-item.active { background: rgba(255,176,32,0.10); border-color: rgba(255,176,32,0.35); }
+  .ws-item .slug { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .rail .spacer { flex: 1; }
+  .btn {
+    border: 1px solid var(--line); background: var(--panel);
+    color: var(--ink); padding: 10px 14px; border-radius: 10px; font-weight: 600; font-size: 13px;
+    width: 100%;
+  }
+  .btn:hover { border-color: var(--signal); }
+  .btn-primary { background: linear-gradient(135deg, var(--signal), #ff7a45); color: #10141d; border: none; }
+  .btn-ghost { background: transparent; }
+  .foot { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 0.06em; }
+  main { padding: 30px 34px 60px; max-width: 1180px; }
+  .head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 26px; flex-wrap: wrap; }
+  .head h1 { font-family: var(--display); font-weight: 600; font-size: 27px; letter-spacing: -0.02em; margin: 0; }
+  .head .sub { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 26px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 18px 16px; }
+  .kpi .k-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .kpi .k-value { font-family: var(--display); font-weight: 700; font-size: 34px; margin-top: 8px; letter-spacing: -0.02em; }
+  .kpi .k-value small { font-size: 15px; color: var(--muted); font-weight: 500; }
+  .grid2 { display: grid; grid-template-columns: 1.35fr 1fr; gap: 18px; }
+  @media (max-width: 980px) { .grid2 { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .card h2 { font-family: var(--display); font-weight: 600; font-size: 15px; margin: 0 0 16px; letter-spacing: -0.01em; }
+  .funnel { display: flex; flex-direction: column; gap: 11px; }
+  .stage-row { display: grid; grid-template-columns: 92px 1fr 40px; align-items: center; gap: 12px; }
+  .stage-name { font-family: var(--mono); font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .bar-track { height: 12px; background: var(--panel-2); border-radius: 7px; overflow: hidden; border: 1px solid var(--line); }
+  .bar-fill { height: 100%; border-radius: 7px 0 0 7px; transition: width .5s cubic-bezier(.2,.7,.2,1); min-width: 2px; }
+  @media (prefers-reduced-motion: reduce) { .bar-fill { transition: none; } }
+  .stage-count { font-family: var(--mono); font-size: 13px; text-align: right; font-weight: 600; }
+  .lead-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lead-tbl th { text-align: left; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 0 10px 10px; font-weight: 500; }
+  .lead-tbl td { padding: 10px; border-top: 1px solid var(--line); }
+  .lead-tbl .phone { font-family: var(--mono); font-size: 12px; }
+  .tag { font-family: var(--mono); font-size: 10px; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.06em; border: 1px solid currentColor; }
+  .events { display: flex; flex-direction: column; gap: 0; max-height: 340px; overflow: auto; }
+  .ev { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 12.5px; }
+  .ev:first-child { border-top: none; }
+  .ev .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; background: var(--muted); flex-shrink: 0; }
+  .ev .etype { font-family: var(--mono); font-size: 11px; color: var(--ink); }
+  .ev .meta { color: var(--muted); font-family: var(--mono); font-size: 10.5px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; font-family: var(--mono); }
+  .overlay { position: fixed; inset: 0; background: rgba(6,9,16,0.72); backdrop-filter: blur(4px); display: none; place-items: center; z-index: 40; padding: 20px; }
+  .overlay.show { display: grid; }
+  .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 26px; width: 100%; max-width: 420px; }
+  .modal h3 { font-family: var(--display); font-weight: 600; margin: 0 0 4px; font-size: 19px; }
+  .modal p { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+  .field { margin-bottom: 13px; }
+  .field label { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .field input {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink);
+    padding: 10px 12px; border-radius: 9px; font-size: 14px; font-family: var(--body);
+  }
+  .field input:focus { border-color: var(--signal); outline: none; }
+  .modal .row { display: flex; gap: 10px; margin-top: 8px; }
+  .keybox { background: var(--panel-2); border: 1px solid rgba(255,176,32,0.35); border-radius: 10px; padding: 12px; margin-top: 6px; word-break: break-all; font-family: var(--mono); font-size: 12px; }
+  .err { color: var(--lost); font-size: 12.5px; font-family: var(--mono); margin-top: 8px; min-height: 16px; }
+</style>
+</head>
+<body>
+  <aside class="rail">
+    <div class="brand">
+      <div class="mark">F</div>
+      <div class="name">Force<b>IA</b></div>
+    </div>
+    <div class="status"><span class="pulse"></span> Online · nunca dorme</div>
+    <div>
+      <div class="label">Workspaces</div>
+      <div class="ws-list" id="ws-list"></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn btn-primary" id="new-ws">+ Novo workspace</button>
+    <button class="btn btn-ghost" id="btn-logout">Trocar token</button>
+    <div class="foot">Console interno · v1.0</div>
+  </aside>
+  <main>
+    <div class="head">
+      <div>
+        <h1 id="ws-title">Selecione um workspace</h1>
+        <div class="sub" id="ws-sub">—</div>
+      </div>
+      <button class="btn" style="width:auto" id="btn-refresh">Atualizar</button>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="k-label">Leads totais</div><div class="k-value" id="kpi-total">—</div></div>
+      <div class="kpi"><div class="k-label">Taxa de fechamento</div><div class="k-value" id="kpi-win">—<small>%</small></div></div>
+      <div class="kpi"><div class="k-label">Em negociacao</div><div class="k-value" id="kpi-active">—</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <h2>Pipeline</h2>
+        <div class="funnel" id="funnel"><div class="empty">Sem dados</div></div>
+      </div>
+      <div class="card">
+        <h2>Atividade recente</h2>
+        <div class="events" id="events"><div class="empty">Sem eventos</div></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <h2>Leads recentes</h2>
+      <div id="leads-wrap"><div class="empty">Sem leads</div></div>
+    </div>
+  </main>
+  <div class="overlay" id="gate">
+    <div class="modal">
+      <h3>Acesso ao console</h3>
+      <p>Informe o <b>ADMIN_TOKEN</b> configurado no servidor.</p>
+      <div class="field">
+        <label for="token-in">Admin token</label>
+        <input id="token-in" type="password" placeholder="cole o token" autocomplete="off" />
+      </div>
+      <button class="btn btn-primary" id="token-go">Entrar</button>
+      <div class="err" id="gate-err"></div>
+    </div>
+  </div>
+  <div class="overlay" id="ws-modal">
+    <div class="modal">
+      <h3>Novo workspace</h3>
+      <p>Cria um cliente isolado (leads, mensagens e eventos proprios).</p>
+      <div class="field"><label for="in-name">Nome</label><input id="in-name" placeholder="Clinica Sol" /></div>
+      <div class="field"><label for="in-slug">Slug</label><input id="in-slug" placeholder="clinica-sol" /></div>
+      <div class="field"><label for="in-inst">Instancia Evolution (opcional)</label><input id="in-inst" placeholder="clinica-sol-wa" /></div>
+      <div id="ws-created" style="display:none">
+        <label style="font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">API key (guarde agora)</label>
+        <div class="keybox" id="ws-key"></div>
+      </div>
+      <div class="err" id="ws-err"></div>
+      <div class="row">
+        <button class="btn btn-primary" id="ws-save">Criar</button>
+        <button class="btn btn-ghost" id="ws-cancel">Fechar</button>
+      </div>
+    </div>
+  </div>
+<script>
+const STAGE_COLORS = { sdr:"var(--sdr)", qualified:"var(--qualified)", closer:"var(--closer)", followup:"var(--followup)", won:"var(--won)", lost:"var(--lost)" };
+const STAGE_ORDER = ["sdr","qualified","closer","followup","won","lost"];
+let TOKEN = localStorage.getItem("forceia_admin_token") || "";
+let CURRENT = null;
+const $ = (s) => document.querySelector(s);
+function headers() { return { "X-Admin-Token": TOKEN, "Content-Type": "application/json" }; }
+async function api(path, opts={}) {
+  const res = await fetch(path, { ...opts, headers: { ...headers(), ...(opts.headers||{}) } });
+  if (res.status === 401) { openGate("Token invalido."); throw new Error("unauthorized"); }
+  if (!res.ok) { const t = await res.text(); throw new Error(t || res.status); }
+  return res.json();
+}
+function openGate(msg) { $("#gate").classList.add("show"); $("#gate-err").textContent = msg || ""; }
+function closeGate() { $("#gate").classList.remove("show"); }
+async function boot() {
+  if (!TOKEN) { openGate(""); return; }
+  try {
+    const wss = await api("/api/workspaces");
+    renderWorkspaces(wss);
+    if (wss.length) selectWorkspace(wss[0].slug);
+    closeGate();
+  } catch (e) { }
+}
+function renderWorkspaces(wss) {
+  const el = $("#ws-list");
+  if (!wss.length) { el.innerHTML = '<div class="empty" style="text-align:left;padding:8px 0">Nenhum ainda</div>'; return; }
+  el.innerHTML = "";
+  wss.forEach(w => {
+    const b = document.createElement("button");
+    b.className = "ws-item" + (w.slug === CURRENT ? " active" : "");
+    b.innerHTML = `<span>${escapeHtml(w.name)}</span><span class="slug">${escapeHtml(w.slug)}</span>`;
+    b.onclick = () => selectWorkspace(w.slug);
+    el.appendChild(b);
+  });
+}
+async function selectWorkspace(slug) {
+  CURRENT = slug;
+  document.querySelectorAll(".ws-item").forEach(n => n.classList.remove("active"));
+  [...document.querySelectorAll(".ws-item .slug")].forEach(s => { if (s.textContent === slug) s.closest(".ws-item").classList.add("active"); });
+  $("#ws-title").textContent = slug;
+  $("#ws-sub").textContent = "carregando…";
+  try {
+    const [metrics, leads, events] = await Promise.all([
+      api(`/api/workspaces/${slug}/metrics`),
+      api(`/api/workspaces/${slug}/leads?limit=60`),
+      api(`/api/workspaces/${slug}/events?limit=40`),
+    ]);
+    renderMetrics(metrics);
+    renderLeads(leads);
+    renderEvents(events);
+    $("#ws-sub").textContent = `${metrics.total} leads · atualizado agora`;
+  } catch (e) { $("#ws-sub").textContent = "erro ao carregar"; }
+}
+function renderMetrics(m) {
+  $("#kpi-total").textContent = m.total;
+  $("#kpi-win").innerHTML = Math.round((m.win_rate||0)*100) + '<small>%</small>';
+  const active = (m.by_stage.qualified||0) + (m.by_stage.closer||0);
+  $("#kpi-active").textContent = active;
+  const max = Math.max(1, ...STAGE_ORDER.map(s => m.by_stage[s]||0));
+  const f = $("#funnel");
+  f.innerHTML = "";
+  STAGE_ORDER.forEach(stage => {
+    const count = m.by_stage[stage] || 0;
+    const row = document.createElement("div");
+    row.className = "stage-row";
+    row.innerHTML =
+      `<div class="stage-name">${stage}</div>
+       <div class="bar-track"><div class="bar-fill" style="width:${(count/max*100).toFixed(1)}%;background:${STAGE_COLORS[stage]}"></div></div>
+       <div class="stage-count">${count}</div>`;
+    f.appendChild(row);
+  });
+}
+function renderLeads(leads) {
+  const wrap = $("#leads-wrap");
+  if (!leads.length) { wrap.innerHTML = '<div class="empty">Sem leads</div>'; return; }
+  const rows = leads.map(l => `
+    <tr>
+      <td class="phone">${escapeHtml(l.phone||"")}</td>
+      <td>${escapeHtml(l.name||"—")}</td>
+      <td>${escapeHtml(l.company||"—")}</td>
+      <td><span class="tag" style="color:${STAGE_COLORS[l.stage]||"var(--muted)"}">${escapeHtml(l.stage||"")}</span></td>
+      <td class="phone" style="color:var(--muted)">${fmtDate(l.last_message_at || l.updated_at)}</td>
+    </tr>`).join("");
+  wrap.innerHTML = `<table class="lead-tbl"><thead><tr>
+    <th>Telefone</th><th>Nome</th><th>Empresa</th><th>Estagio</th><th>Ultima msg</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+function renderEvents(events) {
+  const el = $("#events");
+  if (!events.length) { el.innerHTML = '<div class="empty">Sem eventos</div>'; return; }
+  el.innerHTML = events.map(e => `
+    <div class="ev">
+      <div class="dot"></div>
+      <div>
+        <div class="etype">${escapeHtml(e.type||"")}</div>
+        <div class="meta">${fmtDate(e.created_at)}</div>
+      </div>
+    </div>`).join("");
+}
+function fmtDate(s) {
+  if (!s) return "—";
+  const d = new Date(s);
+  if (isNaN(d)) return "—";
+  return d.toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({
+  "&":"&","<":"<",">":">",'"':""","'":"&#39;"
+}[c])); }
+$("#token-go").onclick = () => {
+  const v = $("#token-in").value.trim();
+  if (!v) { $("#gate-err").textContent = "Informe o token."; return; }
+  TOKEN = v; localStorage.setItem("forceia_admin_token", v);
+  boot();
+};
+$("#token-in").addEventListener("keydown", e => { if (e.key === "Enter") $("#token-go").click(); });
+$("#btn-logout").onclick = () => { localStorage.removeItem("forceia_admin_token"); TOKEN = ""; openGate(""); };
+$("#btn-refresh").onclick = () => CURRENT && selectWorkspace(CURRENT);
+$("#new-ws").onclick = () => { $("#ws-modal").classList.add("show"); $("#ws-created").style.display="none"; $("#ws-err").textContent=""; };
+$("#ws-cancel").onclick = () => { $("#ws-modal").classList.remove("show"); boot(); };
+$("#ws-save").onclick = async () => {
+  $("#ws-err").textContent = "";
+  const name = $("#in-name").value.trim();
+  const slug = $("#in-slug").value.trim();
+  const instance = $("#in-inst").value.trim() || null;
+  if (!name || !slug) { $("#ws-err").textContent = "Nome e slug sao obrigatorios."; return; }
+  try {
+    const r = await api("/api/workspaces", { method:"POST", body: JSON.stringify({ name, slug, instance }) });
+    $("#ws-created").style.display = "block";
+    $("#ws-key").textContent = r.api_key;
+    renderWorkspaces(await api("/api/workspaces"));
+  } catch (e) {
+    $("#ws-err").textContent = String(e.message||e).includes("409") ? "Slug ja existe." : "Erro ao criar workspace.";
+  }
+};
+boot();
+</script>
+</body>
+</html>
