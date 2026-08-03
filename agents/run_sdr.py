@@ -1,13 +1,20 @@
 """
-ForceIA - Agente SDR (MVP)
-Qualifica leads e agenda reunioes via WhatsApp (Evolution API).
+ForceIA - Runtime dos agentes (SDR / Closer / Follow-up)
+com persistencia no Supabase e envio via Evolution API.
 """
 
+from __future__ import annotations
+
 import os
-import json
+from typing import Any
+
+import httpx
 from dotenv import load_dotenv
 from openai import OpenAI
-import httpx
+
+from db import add_message, get_history, get_lead_by_phone, log_event, set_stage, upsert_lead
+from prompts import load_prompt
+from state_machine import detect_stage_from_reply, next_agent_for_stage
 
 load_dotenv()
 
@@ -18,49 +25,31 @@ EVOLUTION_INSTANCE = os.getenv("EVOLUTION_INSTANCE", "forceia")
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-SDR_SYSTEM_PROMPT = """Voce e o SDR da ForceIA, um time de vendas de IA.
-
-Seu objetivo e:
-1. Qualificar o lead usando BANT (Budget, Authority, Need, Timeline)
-2. Entender a dor e o produto/servico de interesse
-3. Quando o lead estiver qualificado, oferecer agenda de reuniao
-
-Regras:
-- Fale em portugues brasileiro, tom profissional e amigavel
-- Faca no maximo 2-3 perguntas por mensagem
-- Nao seja insistente demais
-- Se o lead pedir para falar com humano, anote e confirme que sera transferido
-- Sempre confirme dados importantes (nome, empresa, telefone se necessario)
-
-Quando o lead estiver qualificado (BANT minimo), responda com:
-[QUALIFICADO] e sugira horarios ou peca o melhor dia/horario.
-"""
-
 
 def send_whatsapp(number: str, text: str) -> dict:
-    """Envia mensagem via Evolution API."""
     url = f"{EVOLUTION_API_URL}/message/sendText/{EVOLUTION_INSTANCE}"
-    headers = {
-        "apikey": EVOLUTION_API_KEY,
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "number": number,
-        "text": text,
-    }
+    headers = {"apikey": EVOLUTION_API_KEY, "Content-Type": "application/json"}
+    payload = {"number": number, "text": text}
     with httpx.Client(timeout=30) as http:
         r = http.post(url, json=payload, headers=headers)
         r.raise_for_status()
         return r.json()
 
 
-def sdr_reply(user_message: str, history: list[dict] | None = None) -> str:
-    """Gera resposta do agente SDR."""
-    messages = [{"role": "system", "content": SDR_SYSTEM_PROMPT}]
-    if history:
-        messages.extend(history)
+def build_messages(agent: str, history: list[dict], user_message: str) -> list[dict]:
+    system = load_prompt(agent)
+    messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
+    for h in history:
+        role = h.get("role")
+        content = h.get("content")
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content})
     messages.append({"role": "user", "content": user_message})
+    return messages
 
+
+def generate_reply(agent: str, history: list[dict], user_message: str) -> str:
+    messages = build_messages(agent, history, user_message)
     response = client.chat.completions.create(
         model=os.getenv("GPT_MODEL", "gpt-4o-mini"),
         messages=messages,
@@ -69,23 +58,61 @@ def sdr_reply(user_message: str, history: list[dict] | None = None) -> str:
     return response.choices[0].message.content or ""
 
 
-def handle_incoming(number: str, text: str, history: list[dict] | None = None) -> str:
-    """Processa mensagem recebida e responde no WhatsApp."""
-    reply = sdr_reply(text, history)
-    send_whatsapp(number, reply)
+def handle_incoming(number: str, text: str, send: bool = True) -> str:
+    """Processa mensagem: carrega lead, escolhe agente, responde e persiste."""
+    lead = get_lead_by_phone(number)
+    if not lead:
+        lead = upsert_lead(number, stage="sdr")
+        log_event(lead["id"], "lead_created", {"phone": number})
+
+    stage = lead.get("stage") or "sdr"
+    agent = next_agent_for_stage(stage)
+    history_rows = get_history(lead["id"], limit=20)
+    history = [{"role": r["role"], "content": r["content"]} for r in history_rows]
+
+    reply = generate_reply(agent, history, text)
+    new_stage = detect_stage_from_reply(reply, stage)
+
+    add_message(lead["id"], "user", text)
+    add_message(lead["id"], "assistant", reply, agent=agent)
+
+    if new_stage != stage:
+        set_stage(number, new_stage)
+        log_event(lead["id"], "stage_changed", {"from": stage, "to": new_stage})
+
+    upsert_lead(number)  # atualiza last_message_at
+
+    if send:
+        try:
+            send_whatsapp(number, reply)
+        except Exception as exc:
+            log_event(lead["id"], "whatsapp_send_error", {"error": str(exc)})
+
     return reply
 
 
 if __name__ == "__main__":
-    # Teste local sem WhatsApp
-    print("ForceIA SDR Agent - modo teste local")
-    print("Digite mensagens (ou 'sair'):\n")
-    history = []
+    print("ForceIA Agent - modo teste local (sem WhatsApp)")
+    print("Digite mensagens (ou 'sair'). Usa Supabase se configurado.\n")
+    phone = "5511999999999"
     while True:
         user = input("Lead: ").strip()
         if user.lower() in ("sair", "exit", "quit"):
             break
-        reply = sdr_reply(user, history)
-        print(f"SDR: {reply}\n")
-        history.append({"role": "user", "content": user})
-        history.append({"role": "assistant", "content": reply})
+        try:
+            reply = handle_incoming(phone, user, send=False)
+            print(f"Agente: {reply}\n")
+        except Exception as e:
+            print(f"Erro: {e}\n")
+            # fallback sem Supabase
+            from prompts import load_prompt
+
+            msgs = [
+                {"role": "system", "content": load_prompt("sdr")},
+                {"role": "user", "content": user},
+            ]
+            r = client.chat.completions.create(
+                model=os.getenv("GPT_MODEL", "gpt-4o-mini"),
+                messages=msgs,
+            )
+            print(f"SDR (local): {r.choices[0].message.content}\n")

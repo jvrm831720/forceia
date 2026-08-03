@@ -1,28 +1,40 @@
-# Setup detalhado - ForceIA MVP
+# Setup ForceIA MVP (com Supabase)
 
-## 1. Variaveis de ambiente
+## 1. Supabase
 
-Copie `.env.example` para `.env` e preencha:
+Siga `docs/SUPABASE.md`:
+1. Crie o projeto
+2. Rode `supabase/schema.sql`
+3. Preencha `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` no `.env`
 
-- `OPENAI_API_KEY` (obrigatorio)
-- `EVOLUTION_API_KEY` (mesmo valor usado no docker-compose)
-- `EVOLUTION_INSTANCE` (nome da instancia criada na Evolution)
+## 2. Variaveis
 
-## 2. Subir Evolution API
+```bash
+cp .env.example .env
+```
+
+Obrigatorio:
+- `OPENAI_API_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Para WhatsApp:
+- `EVOLUTION_API_KEY`
+- `EVOLUTION_INSTANCE`
+
+## 3. Evolution API (WhatsApp)
 
 ```bash
 docker compose up -d
 ```
 
-Acesse http://localhost:8080 e:
-1. Crie uma instancia (ex: forceia)
-2. Conecte o WhatsApp via QR Code
-3. Configure o webhook de mensagens para:
-   `http://SEU_IP:8000/webhook/evolution`
+1. Abra http://localhost:8080
+2. Crie instancia (ex: `forceia`)
+3. Conecte o QR Code
+4. Webhook de mensagens → `https://SEU_TUNEL/webhook/evolution`
+   (use ngrok em dev: `ngrok http 8000`)
 
-(Para desenvolvimento local use ngrok ou similar.)
-
-## 3. Rodar o webhook
+## 4. Agentes
 
 ```bash
 cd agents
@@ -30,15 +42,16 @@ pip install -r requirements.txt
 python webhook_server.py
 ```
 
-## 4. Testar o SDR sem WhatsApp
+Teste so o dialogo (sem WhatsApp):
 
 ```bash
 python run_sdr.py
 ```
 
-Converse no terminal para validar o prompt e o fluxo BANT.
+## 5. Fluxo esperado
 
-## 5. Teste ponta a ponta
-
-Envie uma mensagem do celular para o numero conectado na Evolution.
-O webhook deve processar e responder automaticamente.
+1. Lead manda WhatsApp
+2. Evolution → webhook ForceIA
+3. Lead criado/atualizado no Supabase (`stage=sdr`)
+4. Agente SDR responde
+5. Se a resposta tiver `[QUALIFICADO]`, stage vira `qualified` e o Closer assume nas proximas mensagens
