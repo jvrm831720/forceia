@@ -40,7 +40,6 @@ log = get_logger("forceia.agent")
 
 _openai_clients: dict[str, OpenAI] = {}
 
-# Temperaturas por papel (SDR mais exploratorio, closer mais preciso)
 _AGENT_TEMPERATURE = {
     "sdr": 0.65,
     "closer": 0.45,
@@ -97,7 +96,6 @@ def generate_reply(
     *,
     lead: dict | None = None,
 ) -> str:
-    """Gera resposta bruta do modelo (pode conter ---META---)."""
     if not ws.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY nao configurada (workspace nem .env)")
     client = _openai_client(ws.openai_api_key)
@@ -146,7 +144,6 @@ def sync_twenty(ws: WorkspaceContext, lead: dict) -> None:
 
 
 def _maybe_auto_qualify(stage: str, bant: dict | None, meta_stage: str) -> str:
-    """Se o modelo nao marcou qualified mas BANT esta forte, sugere qualified."""
     if stage == "sdr" and is_bant_qualified(bant) and meta_stage == stage:
         return "qualified"
     return meta_stage
@@ -160,10 +157,7 @@ def handle_incoming(
     send: bool = True,
     message_id: str | None = None,
 ) -> str:
-    """
-    Entrada principal de uma mensagem do lead.
-    Preferencia: LangGraph (checkpoints + retries). Fallback: fluxo linear legado.
-    """
+    """Entrada principal. Preferencia: LangGraph. Fallback: fluxo linear legado."""
     try:
         from graph import graph_enabled, invoke_turn
 
@@ -184,7 +178,7 @@ def handle_incoming(
     except Exception as exc:
         log.warning(
             "langgraph falhou, usando fluxo legado: %s",
-            exp if False else exc,
+            str(exc),
             extra={"workspace": workspace.slug, "phone": number},
         )
 
