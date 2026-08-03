@@ -1,22 +1,15 @@
 """
-ForceIA - Grafo de agentes (LangGraph).
+ForceIA - Grafo de agentes (LangGraph) + traces Langfuse.
 
-Substitui a orquestracao linear caseira por um StateGraph com:
-- estado tipado do funil SDR → qualified → closer → followup → won/lost
-- checkpoints por lead (thread_id = workspace:phone)
-- retries no no de geracao (falhas de LLM/rede)
-
-API publica:
-  invoke_turn(workspace, phone, text, *, send=True, message_id=None) -> str
-
-Requer: pip install langgraph langchain-core
-Se langgraph nao estiver instalado, run_sdr cai no caminho legado.
+prepare → generate (retry) → parse → route → persist
+Checkpoints por lead; observabilidade em cada no.
 """
 
 from __future__ import annotations
 
 import operator
 import os
+from contextlib import contextmanager
 from typing import Annotated, Any, TypedDict
 
 from state_machine import STAGES, can_transition, next_agent_for_stage
@@ -40,6 +33,7 @@ class AgentState(TypedDict, total=False):
     error: str | None
     retry_count: int
     events: Annotated[list[str], operator.add]
+    _trace: Any
 
 
 def _langgraph_available() -> bool:
@@ -48,6 +42,11 @@ def _langgraph_available() -> bool:
         return True
     except ImportError:
         return False
+
+
+@contextmanager
+def _nullspan():
+    yield None
 
 
 def build_sales_graph(checkpointer: Any = None):
@@ -131,6 +130,14 @@ def _node_prepare(state: AgentState) -> dict:
         agent = "closer" if stage == "won" else "sdr"
     history_rows = get_history(lead["id"], limit=24)
     history = [{"role": r["role"], "content": r["content"]} for r in history_rows]
+    trace = state.get("_trace")
+    if trace is not None:
+        try:
+            with trace.span("prepare", stage=stage, agent=agent, lead_id=lead.get("id"), history_len=len(history)):
+                pass
+            trace.update(metadata={"stage": stage, "agent": agent, "lead_id": lead.get("id")})
+        except Exception:
+            pass
     return {
         "lead": lead, "stage": stage, "agent": agent, "history": history,
         "meta": {}, "error": None, "retry_count": state.get("retry_count") or 0, "events": events,
@@ -145,16 +152,21 @@ def _node_generate(state: AgentState) -> dict:
         ws = resolve_workspace(slug=state.get("workspace_slug") or "default")
     if ws is None:
         raise RuntimeError("workspace nao resolvido no no generate")
-    raw = generate_reply(
-        ws, state["agent"], state.get("history") or [], state["user_message"],
-        lead=state.get("lead") or {},
-    )
+    trace = state.get("_trace")
+    ctx = trace.span("generate", agent=state.get("agent"), stage=state.get("stage")) if trace else _nullspan()
+    with ctx:
+        raw = generate_reply(
+            ws, state["agent"], state.get("history") or [], state["user_message"],
+            lead=state.get("lead") or {},
+            trace=trace,
+        )
     return {"raw_reply": raw, "events": ["generated"]}
 
 
 def _node_parse(state: AgentState) -> dict:
     from intelligence import (
-        apply_meta_to_lead_fields, is_bant_qualified, split_reply_and_meta, stage_from_meta_or_tags,
+        apply_meta_to_lead_fields, bant_score, is_bant_qualified,
+        split_reply_and_meta, stage_from_meta_or_tags,
     )
     from utils import strip_control_blocks
     raw = state.get("raw_reply") or ""
@@ -179,6 +191,14 @@ def _node_parse(state: AgentState) -> dict:
             updated_lead["metadata"] = meta_lead
         else:
             updated_lead[k] = v
+    trace = state.get("_trace")
+    if trace is not None:
+        try:
+            with trace.span("parse", stage_from=stage, stage_to=new_stage, handoff=bool(meta.get("handoff")), bant_score=bant_score(bant)):
+                pass
+            trace.event("meta_extracted", stage=new_stage, intent=meta.get("intent"), objection=meta.get("objection"), handoff=bool(meta.get("handoff")), bant=bant or {})
+        except Exception:
+            pass
     return {
         "visible_reply": reply, "meta": meta or {}, "new_stage": new_stage,
         "lead": updated_lead, "events": [f"parsed:{stage}->{new_stage}"],
@@ -188,8 +208,23 @@ def _node_parse(state: AgentState) -> dict:
 def _node_route(state: AgentState) -> dict:
     current = state.get("stage") or "sdr"
     target = state.get("new_stage") or current
+    blocked = False
     if target != current and not can_transition(current, target):
-        return {"new_stage": current, "events": [f"blocked:{current}->{target}"]}
+        blocked = True
+        target = current
+    trace = state.get("_trace")
+    if trace is not None:
+        try:
+            with trace.span("route", from_stage=current, to_stage=target, blocked=blocked):
+                pass
+            if blocked:
+                trace.event("transition_blocked", from_stage=current, attempted=state.get("new_stage"))
+            elif target != current:
+                trace.event("transition", from_stage=current, to_stage=target)
+        except Exception:
+            pass
+    if blocked:
+        return {"new_stage": current, "events": [f"blocked:{current}->{state.get('new_stage')}"]}
     return {"events": [f"routed:{target}"]}
 
 
@@ -249,9 +284,16 @@ def _node_persist(state: AgentState) -> dict:
         try:
             send_whatsapp(ws, phone, reply)
             events_out.append("whatsapp_sent")
-        except Exception as exc:
-            log_event("whatsapp_send_error", {"error": str(exc)}, lead_id=lead.get("id") if lead else lead_id, workspace_id=workspace_id)
+        except Exception as exp:
+            log_event("whatsapp_send_error", {"error": str(exp)}, lead_id=lead.get("id") if lead else lead_id, workspace_id=workspace_id)
             events_out.append("whatsapp_error")
+    trace = state.get("_trace")
+    if trace is not None:
+        try:
+            with trace.span("persist", stage=new_stage, whatsapp=("whatsapp_sent" in events_out), events=events_out):
+                pass
+        except Exception:
+            pass
     return {"lead": lead, "visible_reply": reply, "events": events_out}
 
 
@@ -268,6 +310,16 @@ def invoke_turn(
     send: bool = True,
     message_id: str | None = None,
 ) -> str:
+    from observability import start_turn_trace, flush as lf_flush
+
+    trace = start_turn_trace(
+        workspace_id=workspace_id,
+        workspace_slug=workspace_slug,
+        phone=phone,
+        user_message=text,
+        session_id=thread_id_for(workspace_id, phone),
+        tags=["langgraph"],
+    )
     app = get_compiled_graph()
     config = {"configurable": {"thread_id": thread_id_for(workspace_id, phone)}}
     initial: AgentState = {
@@ -279,9 +331,29 @@ def invoke_turn(
         "send_whatsapp": send,
         "events": [],
         "retry_count": 0,
+        "_trace": trace,
     }
-    final = app.invoke(initial, config)
-    return final.get("visible_reply") or ""
+    try:
+        final = app.invoke(initial, config)
+        reply = final.get("visible_reply") or ""
+        trace.end(
+            output={"reply": reply[:2000], "stage": final.get("new_stage") or final.get("stage")},
+            metadata={
+                "events": final.get("events") or [],
+                "agent": final.get("agent"),
+                "stage": final.get("new_stage") or final.get("stage"),
+            },
+        )
+        return reply
+    except Exception as exc:
+        try:
+            trace.event("turn_error", error=str(exc)[:500])
+            trace.end(metadata={"error": str(exc)[:500]})
+        except Exception:
+            pass
+        raise
+    finally:
+        lf_flush()
 
 
 def graph_enabled() -> bool:
