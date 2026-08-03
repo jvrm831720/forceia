@@ -2,7 +2,7 @@
 
 **Seu time de vendas de IA que trabalha 24h por menos de 30% do custo de um SDR humano.**
 
-ForceIA e um time de agentes de IA (SDR + Closer + Follow-up + Relatorios) no WhatsApp, com persistencia no **Supabase**.
+Time de agentes (SDR + Closer + Follow-up) no WhatsApp, com **Supabase** + **Twenty CRM**.
 
 ## Repo
 
@@ -16,9 +16,8 @@ https://github.com/jvrm831720/forceia
 | Agentes | Python + OpenAI |
 | Estados | SDR → Qualified → Closer → Follow-up |
 | Banco | Supabase |
-| Jobs | Follow-up automatico (cron / scheduler) |
-| CRM (fase 2) | Twenty |
-| Integracoes (fase 2) | Composio |
+| CRM | Twenty (People + Opportunities) |
+| Jobs | Follow-up + sync Twenty |
 
 ## Quick Start
 
@@ -26,39 +25,29 @@ https://github.com/jvrm831720/forceia
 git clone https://github.com/jvrm831720/forceia.git
 cd forceia
 cp .env.example .env
-# OPENAI_API_KEY + SUPABASE_*
+# OPENAI_API_KEY, SUPABASE_*, TWENTY_*
 
-# Schema: cole supabase/schema.sql no SQL Editor do Supabase
+# Schema Supabase: supabase/schema.sql
+docker compose up -d
 
-docker compose up -d   # Evolution API
-
-cd agents
-pip install -r requirements.txt
-python run_sdr.py              # teste dialogo
-python webhook_server.py       # producao WhatsApp
+cd agents && pip install -r requirements.txt
+python run_sdr.py
+python webhook_server.py
 python followup_job.py --dry-run
+python sync_twenty_job.py --dry-run
 ```
 
 Docs:
 - [Setup](docs/SETUP.md)
 - [Supabase](docs/SUPABASE.md)
-- [Follow-up jobs](docs/FOLLOWUP.md)
-- [Arquitetura](docs/ARCHITECTURE.md)
+- [Twenty CRM](docs/TWENTY.md)
+- [Follow-up](docs/FOLLOWUP.md)
 
-## Estagios
+## Sync Twenty
 
-`sdr` → `qualified` → `closer` → `won` / `lost` (+ `followup`)
-
-Tags: `[QUALIFICADO]`, `[FECHADO]`, `[PERDIDO]`, `[FOLLOWUP]`
-
-## Follow-up automatico
-
-Leads sem resposta ha N dias recebem mensagem do agente Follow-up.
-
-```bash
-python followup_job.py --days 5
-python scheduler.py --hours 6
-```
+- Novo lead / mudanca de stage → sync automatico
+- `python sync_twenty_job.py` → lote
+- IDs em `leads.metadata.twenty_person_id` / `twenty_opportunity_id`
 
 ## Precos (produto)
 

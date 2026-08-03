@@ -1,6 +1,6 @@
 """
 ForceIA - Runtime dos agentes (SDR / Closer / Follow-up)
-com persistencia no Supabase e envio via Evolution API.
+com persistencia no Supabase, sync Twenty e envio via Evolution API.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import httpx
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from db import add_message, get_history, get_lead_by_phone, log_event, set_stage, upsert_lead
+from db import add_message, get_history, get_lead_by_phone, log_event, merge_metadata, set_stage, upsert_lead
 from prompts import load_prompt
 from state_machine import detect_stage_from_reply, next_agent_for_stage
 
@@ -58,12 +58,33 @@ def generate_reply(agent: str, history: list[dict], user_message: str) -> str:
     return response.choices[0].message.content or ""
 
 
+def sync_twenty(lead: dict) -> None:
+    try:
+        from twenty_client import enabled, sync_lead_to_twenty
+
+        if not enabled():
+            return
+        result = sync_lead_to_twenty(lead)
+        if result.get("person_id"):
+            merge_metadata(
+                lead["phone"],
+                {
+                    "twenty_person_id": result.get("person_id"),
+                    "twenty_opportunity_id": result.get("opportunity_id"),
+                },
+            )
+            log_event(lead.get("id"), "twenty_synced", result)
+    except Exception as exc:
+        log_event(lead.get("id"), "twenty_sync_error", {"error": str(exc)})
+
+
 def handle_incoming(number: str, text: str, send: bool = True) -> str:
-    """Processa mensagem: carrega lead, escolhe agente, responde e persiste."""
+    """Processa mensagem: carrega lead, escolhe agente, responde, persiste e sincroniza Twenty."""
     lead = get_lead_by_phone(number)
     if not lead:
         lead = upsert_lead(number, stage="sdr")
         log_event(lead["id"], "lead_created", {"phone": number})
+        sync_twenty(lead)
 
     stage = lead.get("stage") or "sdr"
     agent = next_agent_for_stage(stage)
@@ -77,10 +98,16 @@ def handle_incoming(number: str, text: str, send: bool = True) -> str:
     add_message(lead["id"], "assistant", reply, agent=agent)
 
     if new_stage != stage:
-        set_stage(number, new_stage)
+        lead = set_stage(number, new_stage)
         log_event(lead["id"], "stage_changed", {"from": stage, "to": new_stage})
-
-    upsert_lead(number)  # atualiza last_message_at
+        sync_twenty(lead)
+    else:
+        upsert_lead(number)
+        # sync periodico leve: so se ainda nao tiver person no metadata
+        meta = lead.get("metadata") or {}
+        if not meta.get("twenty_person_id"):
+            lead = get_lead_by_phone(number) or lead
+            sync_twenty(lead)
 
     if send:
         try:
@@ -93,7 +120,7 @@ def handle_incoming(number: str, text: str, send: bool = True) -> str:
 
 if __name__ == "__main__":
     print("ForceIA Agent - modo teste local (sem WhatsApp)")
-    print("Digite mensagens (ou 'sair'). Usa Supabase se configurado.\n")
+    print("Digite mensagens (ou 'sair'). Usa Supabase + Twenty se configurados.\n")
     phone = "5511999999999"
     while True:
         user = input("Lead: ").strip()
@@ -104,7 +131,6 @@ if __name__ == "__main__":
             print(f"Agente: {reply}\n")
         except Exception as e:
             print(f"Erro: {e}\n")
-            # fallback sem Supabase
             from prompts import load_prompt
 
             msgs = [

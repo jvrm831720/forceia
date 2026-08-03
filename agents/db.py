@@ -82,3 +82,11 @@ def log_event(lead_id: str | None, event_type: str, payload: dict | None = None)
             "payload": payload or {},
         }
     ).execute()
+
+
+def merge_metadata(phone: str, extra: dict) -> dict:
+    """Mescla campos em metadata (ex: twenty_person_id)."""
+    lead = get_lead_by_phone(phone) or {}
+    meta = dict(lead.get("metadata") or {})
+    meta.update(extra)
+    return upsert_lead(phone, metadata=meta)

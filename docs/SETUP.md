@@ -1,4 +1,4 @@
-# Setup ForceIA MVP (com Supabase)
+# Setup ForceIA MVP (Supabase + Twenty)
 
 ## 1. Supabase
 
@@ -7,7 +7,15 @@ Siga `docs/SUPABASE.md`:
 2. Rode `supabase/schema.sql`
 3. Preencha `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` no `.env`
 
-## 2. Variaveis
+## 2. Twenty CRM
+
+Siga `docs/TWENTY.md`:
+1. Suba o Twenty (Docker ou Cloud)
+2. Gere API Key
+3. Preencha `TWENTY_API_URL` e `TWENTY_API_KEY`
+4. Ajuste `TWENTY_STAGE_*` se o pipeline do seu workspace for diferente
+
+## 3. Variaveis
 
 ```bash
 cp .env.example .env
@@ -18,60 +26,36 @@ Obrigatorio:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-Para WhatsApp:
-- `EVOLUTION_API_KEY`
-- `EVOLUTION_INSTANCE`
+WhatsApp:
+- `EVOLUTION_API_KEY` / `EVOLUTION_INSTANCE`
 
-Follow-up (opcional):
-- `FOLLOWUP_STALE_DAYS=5`
-- `FOLLOWUP_MIN_HOURS=48`
+CRM:
+- `TWENTY_API_URL` / `TWENTY_API_KEY`
 
-## 3. Evolution API (WhatsApp)
+## 4. Evolution API
 
 ```bash
 docker compose up -d
 ```
 
-1. Abra http://localhost:8080
-2. Crie instancia (ex: `forceia`)
-3. Conecte o QR Code
-4. Webhook de mensagens → `https://SEU_TUNEL/webhook/evolution`
-   (use ngrok em dev: `ngrok http 8000`)
+Webhook → `https://SEU_TUNEL/webhook/evolution`
 
-## 4. Agentes
+## 5. Agentes
 
 ```bash
 cd agents
 pip install -r requirements.txt
 python webhook_server.py
-```
-
-Teste so o dialogo (sem WhatsApp):
-
-```bash
 python run_sdr.py
-```
-
-## 5. Job de Follow-up
-
-```bash
-# Simular
 python followup_job.py --dry-run
-
-# Enviar de verdade
-python followup_job.py --days 5
-
-# Loop a cada 6h
-python scheduler.py --hours 6 --days 5
+python sync_twenty_job.py --dry-run
 ```
 
-Detalhes em `docs/FOLLOWUP.md`.
-
-## 6. Fluxo esperado
+## 6. Fluxo completo
 
 1. Lead manda WhatsApp
-2. Evolution → webhook ForceIA
-3. Lead criado/atualizado no Supabase (`stage=sdr`)
-4. Agente SDR responde
-5. Se a resposta tiver `[QUALIFICADO]`, stage vira `qualified` e o Closer assume
-6. Se o lead ficar X dias sem responder, o **followup_job** reativa automaticamente
+2. Webhook → agente (SDR/Closer/Follow-up)
+3. Supabase grava lead + mensagens
+4. Twenty recebe Person + Opportunity (stage espelhado)
+5. Job de follow-up reativa parados
+6. Job `sync_twenty_job` pode reconciliar em lote
