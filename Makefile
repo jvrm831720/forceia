@@ -3,7 +3,7 @@
 PY ?= python3
 
 .PHONY: help install install-dev lint fmt test validate run webhook admin followup \
-        compose-up compose-app-up compose-down
+        compose-up compose-app-up compose-down improve pending
 
 help: ## Lista os comandos
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -38,6 +38,12 @@ admin: ## Sobe o painel admin (porta 8100)
 
 followup: ## Roda o job de follow-up (dry-run)
 	cd agents && $(PY) followup_job.py --all --dry-run
+
+improve: ## Gera sugestoes de prompt (nao aplica)
+	cd agents && $(PY) improve_agents.py --workspace default
+
+pending: ## Lista sugestoes pending
+	cd agents && $(PY) improve_agents.py --list-pending
 
 compose-up: ## Sobe apenas a infra (Evolution + Postgres + Redis)
 	docker compose up -d

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 STAGES = ("sdr", "qualified", "closer", "followup", "won", "lost")
 
-# Proximos estagios validos
 TRANSITIONS = {
     "sdr": {"qualified", "followup", "lost"},
     "qualified": {"closer", "followup", "lost"},
@@ -29,12 +28,17 @@ def next_agent_for_stage(stage: str) -> str:
         return "closer"
     if stage == "followup":
         return "followup"
+    if stage == "won":
+        return "closer"
     return "sdr"
 
 
 def detect_stage_from_reply(reply: str, current: str) -> str:
-    """Heuristica simples baseada em tags no texto do agente."""
-    upper = reply.upper()
+    """
+    Heuristica legada baseada em tags no texto.
+    Preferir intelligence.stage_from_meta_or_tags em producao.
+    """
+    upper = (reply or "").upper()
     if "[QUALIFICADO]" in upper or "[QUALIFIED]" in upper:
         if can_transition(current, "qualified"):
             return "qualified"
