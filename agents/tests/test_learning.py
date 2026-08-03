@@ -1,6 +1,12 @@
-"""Testes puros do ciclo de aprendizado (sem OpenAI/Supabase)."""
+"""Testes puros do ciclo de aprendizado STaR+SPIN (sem OpenAI/Supabase)."""
 
-from learning import ensure_meta_protocol, parse_analyst_json, _transcript
+from learning import (
+    _transcript,
+    build_preference_pairs,
+    ensure_meta_protocol,
+    export_preference_dataset,
+    parse_analyst_json,
+)
 
 
 def test_parse_analyst_json_plain():
@@ -41,3 +47,39 @@ def test_transcript_truncates():
     t = _transcript(msgs, max_chars=200)
     assert len(t) <= 200
     assert "cortado" in t
+
+
+def test_build_preference_pairs_spin_format():
+    won = [
+        {
+            "lead_id": "w1",
+            "transcript": "assistant: vamos fechar o plano completo",
+            "agent": "closer",
+            "bant": {"need": "SDR"},
+        }
+    ]
+    lost = [
+        {
+            "lead_id": "l1",
+            "transcript": "assistant: ainda tem interesse?",
+            "agent": "sdr",
+            "bant": {},
+        }
+    ]
+    pairs = build_preference_pairs(won, lost, max_pairs=5)
+    assert len(pairs) == 1
+    assert pairs[0]["real"]["meta"]["outcome"] == "won"
+    assert pairs[0]["generated"]["meta"]["outcome"] == "lost"
+    assert "fechar" in pairs[0]["real"]["content"]
+
+
+def test_export_preference_dataset_hf_shape():
+    pairs = build_preference_pairs(
+        [{"transcript": "won text", "agent": "sdr", "bant": {}, "lead_id": "1"}],
+        [{"transcript": "lost text", "agent": "sdr", "bant": {}, "lead_id": "2"}],
+    )
+    ds = export_preference_dataset(pairs)
+    assert len(ds) == 1
+    assert ds[0]["real"][1]["role"] == "assistant"
+    assert ds[0]["generated"][1]["content"] == "lost text"
+    assert ds[0]["meta"]["real_outcome"] == "won"
