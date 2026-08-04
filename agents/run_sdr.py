@@ -12,6 +12,7 @@ from db import (
     add_message,
     get_history,
     get_lead_by_phone,
+    is_agent_paused,
     log_event,
     mark_message_processed,
     merge_metadata,
@@ -240,6 +241,24 @@ def _handle_incoming_legacy(
         log_event("lead_created", {"phone": number}, lead_id=lead["id"], workspace_id=ws.id)
         log.info("lead criado", extra={"workspace": ws.slug, "phone": number})
         sync_twenty(ws, lead)
+
+    # Humano assumiu: grava mensagem do lead, nao responde com IA
+    if is_agent_paused(lead):
+        add_message(lead["id"], "user", text)
+        if message_id:
+            mark_message_processed(ws.id, message_id, lead_id=lead["id"])
+        log_event(
+            "agent_skipped_paused",
+            {"phone": number, "text": (text or "")[:200]},
+            lead_id=lead["id"],
+            workspace_id=ws.id,
+        )
+        log.info(
+            "agente pausado — mensagem gravada sem resposta",
+            extra={"workspace": ws.slug, "phone": number},
+        )
+        upsert_lead(ws.id, number)  # touch last_message_at
+        return ""
 
     stage = lead.get("stage") or "sdr"
     if stage in ("won", "lost"):
