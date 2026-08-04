@@ -1,9 +1,9 @@
-"""Admin API — scraping de boards de vaga → hiring signals."""
+"""Admin API — scraping de boards de vaga → hiring signals (hardened)."""
 
 from __future__ import annotations
 
 from fastapi import Depends, FastAPI, HTTPException
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 def mount_scraper_routes(app: FastAPI, require_admin) -> None:
@@ -31,20 +31,17 @@ def mount_scraper_routes(app: FastAPI, require_admin) -> None:
     async def api_scrape_hiring(slug: str, body: ScrapeHiringIn):
         from db import get_workspace_playbook, log_event
         from scrapers.hiring_pipeline import prospect_hiring_signals
+        from security import rate_limit_allow, validate_public_http_url
 
         ws = _ws(slug)
         url = body.url.strip()
-        if not url.startswith(("http://", "https://")):
-            raise HTTPException(status_code=400, detail="url deve começar com http(s)")
 
-        # Domínios sensíveis — bloqueio explícito
-        blocked = ("linkedin.com", "facebook.com", "instagram.com")
-        low = url.lower()
-        if any(b in low for b in blocked):
-            raise HTTPException(
-                status_code=400,
-                detail="Scraping deste domínio não é suportado (ToS). Use Greenhouse/Lever/board público.",
-            )
+        if not rate_limit_allow(f"scrape:{ws['id']}", limit=10, window_seconds=60):
+            raise HTTPException(status_code=429, detail="Rate limit de scrape")
+
+        ok, reason = validate_public_http_url(url)
+        if not ok:
+            raise HTTPException(status_code=400, detail=f"URL bloqueada: {reason}")
 
         playbook = get_workspace_playbook(ws["id"])
         try:
@@ -55,17 +52,19 @@ def mount_scraper_routes(app: FastAPI, require_admin) -> None:
                 playbook=playbook,
                 decision_maker_name=body.decision_maker_name,
             )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
             log_event(
                 "scrape_hiring_error",
-                {"url": url, "error": str(exc)},
+                {"url": url[:200], "error": str(exc)[:300]},
                 workspace_id=ws["id"],
             )
-            raise HTTPException(status_code=502, detail=f"scrape falhou: {exc}") from exc
+            raise HTTPException(status_code=502, detail="scrape falhou") from exc
 
         log_event(
             "scrape_hiring_done",
-            {"url": url, "count": report.get("count"), "strong": report.get("strong")},
+            {"url": url[:200], "count": report.get("count"), "strong": report.get("strong")},
             workspace_id=ws["id"],
         )
         return report
