@@ -1,20 +1,13 @@
-"""
-ForceIA - Job de Follow-up multi-tenant (contexto BANT inteligente)
-
-  python followup_job.py
-  python followup_job.py --workspace demo
-  python followup_job.py --all --dry-run
-"""
+"""ForceIA - Job de follow-up multi-tenant."""
 
 from __future__ import annotations
 
-import argparse
 import os
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from db import (
     add_message,
-    get_client,
     get_history,
     list_active_workspaces,
     log_event,
@@ -22,17 +15,20 @@ from db import (
     upsert_lead,
 )
 from dotenv import load_dotenv
-from intelligence import bant_score, split_reply_and_meta
-from run_sdr import generate_reply, send_whatsapp
+from intelligence import split_reply_and_meta
+from logging_config import get_logger
+from run_sdr import generate_reply
 from utils import strip_control_blocks
-from workspace_context import WorkspaceContext, resolve_workspace
+from workspace_context import WorkspaceContext
 
 load_dotenv()
+log = get_logger("forceia.followup")
 
-ELIGIBLE_STAGES = ("sdr", "qualified", "closer", "followup")
 
+def candidates_for_workspace(ws: WorkspaceContext, stale_days: int | None = None) -> list[dict]:
+    from db import get_client
 
-def list_stale_leads(workspace_id: str, days: int, limit: int = 50) -> list[dict]:
+    days = stale_days if stale_days is not None else ws.followup_stale_days
     cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     result = (
         get_client()
@@ -40,17 +36,19 @@ def list_stale_leads(workspace_id: str, days: int, limit: int = 50) -> list[dict
         .select(
             "id, phone, name, company, stage, last_message_at, metadata, workspace_id, bant"
         )
-        .eq("workspace_id", workspace_id)
-        .in_("stage", list(ELIGIBLE_STAGES))
+        .eq("workspace_id", ws.id)
+        .in_("stage", ["sdr", "qualified", "closer", "followup"])
         .lt("last_message_at", cutoff)
         .order("last_message_at", desc=False)
-        .limit(limit)
+        .limit(40)
         .execute()
     )
     return result.data or []
 
 
 def recent_followup_event(lead_id: str, hours: int) -> bool:
+    from db import get_client
+
     since = (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
     result = (
         get_client()
@@ -66,35 +64,43 @@ def recent_followup_event(lead_id: str, hours: int) -> bool:
 
 
 def build_followup_context(lead: dict, history: list[dict]) -> str:
-    """Pedido interno ao modelo com memoria rica do lead."""
+    name = lead.get("name") or ""
+    company = lead.get("company") or ""
+    stage = lead.get("stage") or "sdr"
     bant = lead.get("bant") or {}
     parts = [
-        "Gere UMA mensagem curta de follow-up no WhatsApp (2-4 linhas).",
-        "Nao diga apenas 'ainda tem interesse?'. Use o contexto abaixo.",
-        f"Estagio: {lead.get('stage') or 'sdr'}",
+        f"Lead stage={stage}.",
+        f"Nome: {name or 'desconhecido'}.",
+        f"Empresa: {company or 'desconhecida'}.",
     ]
-    if lead.get("name"):
-        parts.append(f"Nome: {lead['name']}")
-    if lead.get("company"):
-        parts.append(f"Empresa: {lead['company']}")
     if bant:
-        parts.append(f"BANT: {bant} (score={bant_score(bant)})")
-    user_bits = [h["content"] for h in history if h.get("role") == "user"][-3:]
-    if user_bits:
-        parts.append("Ultimas mensagens do lead:")
-        for bit in user_bits:
-            parts.append(f"  - {bit[:200]}")
-    parts.append(
-        "Lembre a dor ou o tema em 1 linha e proponha 1 proximo passo claro. "
-        "Inclua o bloco ---META--- no final conforme o protocolo."
-    )
-    return "\n".join(parts)
+        bits = [f"{k}={v}" for k, v in bant.items() if v]
+        if bits:
+            parts.append("BANT: " + "; ".join(bits))
+    last_user = next((h["content"] for h in reversed(history) if h.get("role") == "user"), "")
+    if last_user:
+        parts.append(f"Ultima msg do lead: {last_user[:180]}")
+    parts.append("Reative com valor, sem cobranca. Uma mensagem curta.")
+    return " ".join(parts)
 
 
 def process_lead(ws: WorkspaceContext, lead: dict, dry_run: bool = False) -> dict:
     lead_id = lead["id"]
     phone = lead["phone"]
     stage = lead.get("stage") or "sdr"
+
+    try:
+        from db import is_agent_paused
+    except ImportError:
+        is_agent_paused = lambda _l: False  # type: ignore
+
+    if is_agent_paused(lead):
+        return {
+            "phone": phone,
+            "workspace": ws.slug,
+            "status": "skipped",
+            "reason": "agent_paused",
+        }
 
     if recent_followup_event(lead_id, ws.followup_min_hours):
         return {
@@ -132,9 +138,16 @@ def process_lead(ws: WorkspaceContext, lead: dict, dry_run: bool = False) -> dic
     upsert_lead(ws.id, phone)
 
     try:
+        from run_sdr import send_whatsapp
+
         send_whatsapp(ws, phone, reply)
-        log_event("followup_sent", {"phone": phone}, lead_id=lead_id, workspace_id=ws.id)
-        return {"phone": phone, "workspace": ws.slug, "status": "sent"}
+        log_event(
+            "followup_sent",
+            {"phone": phone},
+            lead_id=lead_id,
+            workspace_id=ws.id,
+        )
+        return {"phone": phone, "workspace": ws.slug, "status": "sent", "reply": reply}
     except Exception as exc:
         log_event(
             "followup_send_error",
@@ -145,40 +158,35 @@ def process_lead(ws: WorkspaceContext, lead: dict, dry_run: bool = False) -> dic
         return {"phone": phone, "workspace": ws.slug, "status": "error", "error": str(exc)}
 
 
-def run_for_workspace(ws: WorkspaceContext, limit: int = 50, dry_run: bool = False) -> list[dict]:
-    leads = list_stale_leads(ws.id, days=ws.followup_stale_days, limit=limit)
-    print(f"[{ws.slug}] dias={ws.followup_stale_days} candidatos={len(leads)} dry_run={dry_run}")
-    results = []
-    for lead in leads:
-        result = process_lead(ws, lead, dry_run=dry_run)
-        results.append(result)
-        print(f"  {result.get('phone')}: {result.get('status')} {result.get('reason') or ''}")
+def run_followup_job(*, dry_run: bool = False, workspace_slug: str | None = None) -> list[dict]:
+    results: list[dict] = []
+    rows = list_active_workspaces()
+    for row in rows:
+        if workspace_slug and row.get("slug") != workspace_slug:
+            continue
+        ws = WorkspaceContext.from_row(row)
+        for lead in candidates_for_workspace(ws):
+            try:
+                results.append(process_lead(ws, lead, dry_run=dry_run))
+            except Exception as exc:
+                results.append(
+                    {
+                        "phone": lead.get("phone"),
+                        "workspace": ws.slug,
+                        "status": "error",
+                        "error": str(exc),
+                    }
+                )
     return results
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="ForceIA Follow-up Job multi-tenant")
-    parser.add_argument("--workspace", type=str, help="Slug do workspace")
-    parser.add_argument("--all", action="store_true", help="Todos os workspaces ativos")
-    parser.add_argument("--limit", type=int, default=50)
-    parser.add_argument("--dry-run", action="store_true")
-    args = parser.parse_args()
-
-    workspaces: list[WorkspaceContext] = []
-    if args.all:
-        for row in list_active_workspaces():
-            workspaces.append(WorkspaceContext.from_row(row))
-    else:
-        slug = args.workspace or os.getenv("DEFAULT_WORKSPACE_SLUG", "default")
-        ws = resolve_workspace(slug=slug)
-        if not ws:
-            print(f"Workspace '{slug}' nao encontrado")
-            return
-        workspaces = [ws]
-
-    for ws in workspaces:
-        run_for_workspace(ws, limit=args.limit, dry_run=args.dry_run)
-
-
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--workspace", default=None)
+    args = parser.parse_args()
+    out = run_followup_job(dry_run=args.dry_run, workspace_slug=args.workspace)
+    for r in out:
+        print(r)
