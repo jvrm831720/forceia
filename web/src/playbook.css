@@ -1,0 +1,47 @@
+/* Playbook editor — importar em index.css ou App */
+.playbook-card .pb-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+@media (max-width: 800px) {
+  .playbook-card .pb-grid { grid-template-columns: 1fr; }
+}
+.playbook-card .field { margin-bottom: 0; }
+.pb-score {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,0.02);
+}
+.pb-score-bar {
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.pb-score-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.5s ease;
+}
+.pb-score-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: baseline;
+  font-size: 13px;
+  color: var(--muted);
+}
+.pb-score-meta strong {
+  font-family: var(--display);
+  font-size: 20px;
+  color: var(--ink);
+}
+.pb-ok {
+  color: var(--won);
+  font-size: 13px;
+  min-height: 1.2em;
+}
