@@ -21,3 +21,6 @@ langchain-core>=0.2.0
 
 # Observabilidade
 langfuse>=2.0.0
+
+# Integrações (opcional — instale se FORCEIA_COMPOSIO=1)
+# composio>=0.7.0
