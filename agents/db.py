@@ -179,6 +179,95 @@ def merge_metadata(workspace_id: str, phone: str, extra: dict) -> dict:
     return upsert_lead(workspace_id, phone, metadata=meta)
 
 
+def is_agent_paused(lead: dict | None) -> bool:
+    """True se o agente esta pausado (humano assumiu a conversa)."""
+    if not lead:
+        return False
+    meta = lead.get("metadata") or {}
+    return bool(meta.get("agent_paused") or meta.get("human_takeover"))
+
+
+def set_agent_paused(
+    workspace_id: str,
+    lead_id: str,
+    paused: bool,
+    *,
+    by: str | None = None,
+    reason: str | None = None,
+) -> dict:
+    """Pausa ou retoma o agente no lead (metadata.agent_paused)."""
+    lead = get_lead_by_id(workspace_id, lead_id)
+    if not lead:
+        raise ValueError("Lead nao encontrado")
+    meta = dict(lead.get("metadata") or {})
+    meta["agent_paused"] = bool(paused)
+    meta["human_takeover"] = bool(paused)
+    if paused:
+        meta["paused_at"] = datetime.now(UTC).isoformat()
+        if by:
+            meta["paused_by"] = by
+        if reason:
+            meta["pause_reason"] = reason
+    else:
+        meta["resumed_at"] = datetime.now(UTC).isoformat()
+        if by:
+            meta["resumed_by"] = by
+    updated = update_lead_fields(workspace_id, lead_id, metadata=meta)
+    log_event(
+        "agent_paused" if paused else "agent_resumed",
+        {"by": by, "reason": reason, "paused": paused},
+        lead_id=lead_id,
+        workspace_id=workspace_id,
+    )
+    return updated
+
+
+def add_internal_note(
+    workspace_id: str,
+    lead_id: str,
+    note: str,
+    *,
+    author: str | None = None,
+) -> dict:
+    """Grava nota interna (evento + espelho em metadata.notes)."""
+    text = (note or "").strip()
+    if not text:
+        raise ValueError("Nota vazia")
+    lead = get_lead_by_id(workspace_id, lead_id)
+    if not lead:
+        raise ValueError("Lead nao encontrado")
+    entry = {
+        "note": text,
+        "author": author or "admin",
+        "at": datetime.now(UTC).isoformat(),
+    }
+    log_event(
+        "internal_note",
+        entry,
+        lead_id=lead_id,
+        workspace_id=workspace_id,
+    )
+    meta = dict(lead.get("metadata") or {})
+    notes = list(meta.get("notes") or [])
+    notes.append(entry)
+    meta["notes"] = notes[-50:]
+    update_lead_fields(workspace_id, lead_id, metadata=meta)
+    return entry
+
+
+def list_events_for_lead(lead_id: str, limit: int = 50) -> list[dict]:
+    result = (
+        get_client()
+        .table("events")
+        .select("id, type, payload, lead_id, created_at")
+        .eq("lead_id", lead_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
+
+
 def was_message_processed(workspace_id: str, message_id: str) -> bool:
     if not message_id:
         return False
