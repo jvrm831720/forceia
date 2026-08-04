@@ -1,5 +1,5 @@
 """
-ForceIA - Painel Admin (API + dashboard)
+ForceIA - Painel Admin (API + dashboard) — hardened
 
 Auth JWT (recomendado):
   POST /api/auth/login  {username, password} -> access_token
@@ -7,15 +7,13 @@ Auth JWT (recomendado):
 
 Legado: ADMIN_TOKEN ainda aceito via Bearer ou X-Admin-Token.
 Defina ADMIN_PASSWORD (+ JWT_SECRET) ou ADMIN_TOKEN no .env.
-
-  cd agents
-  python admin_server.py            # sobe em http://localhost:8100
 """
 
 from __future__ import annotations
 
 import os
 import secrets
+from datetime import UTC, datetime
 from pathlib import Path
 
 from auth import (
@@ -25,7 +23,6 @@ from auth import (
     auth_enabled,
     create_access_token,
     require_auth,
-    validate_password_strength,
     verify_password,
 )
 from db import (
@@ -48,26 +45,40 @@ from db import (
     update_prompt_suggestion,
     upsert_prompt_override,
 )
-from learning import ensure_meta_protocol
-from datetime import UTC, datetime
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
+from learning import ensure_meta_protocol
 from logging_config import get_logger
 from pydantic import BaseModel, Field
-from state_machine import STAGES, can_transition
+from security import (
+    assert_jwt_secret_safe,
+    client_ip_from_headers,
+    rate_limit_allow,
+    security_headers,
+)
+from state_machine import STAGES
 
 load_dotenv()
 
 log = get_logger("forceia.admin")
 
-APP_VERSION = "1.9.0"
+APP_VERSION = "1.9.1"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 
 app = FastAPI(title="ForceIA Admin", version=APP_VERSION)
 
 require_token = require_auth
+
+
+@app.middleware("http")
+async def _security_middleware(request: Request, call_next):
+    response = await call_next(request)
+    for k, v in security_headers().items():
+        response.headers.setdefault(k, v)
+    return response
+
 
 from integrations.admin_routes import mount_integration_routes
 
@@ -134,13 +145,25 @@ async def health():
 
 
 @app.post("/api/auth/login", response_model=TokenOut)
-async def api_login(payload: LoginIn):
+async def api_login(
+    payload: LoginIn,
+    request: Request,
+    x_forwarded_for: str | None = Header(default=None, alias="X-Forwarded-For"),
+    x_real_ip: str | None = Header(default=None, alias="X-Real-IP"),
+):
     if not auth_enabled():
         raise HTTPException(
             status_code=503,
             detail="Auth desativada: defina ADMIN_PASSWORD ou ADMIN_TOKEN",
         )
+    ip = client_ip_from_headers(
+        x_forwarded_for=x_forwarded_for, x_real_ip=x_real_ip, fallback=request.client.host if request.client else "unknown"
+    )
+    if not rate_limit_allow(f"login:{ip}", limit=10, window_seconds=60):
+        raise HTTPException(status_code=429, detail="Muitas tentativas de login. Aguarde 1 minuto.")
     if not verify_password(payload.username, payload.password):
+        # também conta falhas no rate limit global por usuário
+        rate_limit_allow(f"login:user:{payload.username.strip().lower()}", limit=15, window_seconds=300)
         raise HTTPException(status_code=401, detail="Credenciais invalidas")
     token, expires_in = create_access_token(username=payload.username.strip())
     log.info("login ok", extra={"user": payload.username.strip()})
@@ -221,7 +244,7 @@ async def api_leads(slug: str, limit: int = 100):
     ws = get_workspace_by_slug(slug)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace nao encontrado")
-    return list_leads(ws["id"], limit=limit)
+    return list_leads(ws["id"], limit=min(max(1, limit), 500))
 
 
 def _serialize_lead(lead: dict) -> dict:
@@ -245,7 +268,6 @@ def _serialize_lead(lead: dict) -> dict:
 
 @app.get("/api/workspaces/{slug}/leads/{lead_id}", dependencies=[Depends(require_token)])
 async def api_lead_detail(slug: str, lead_id: str, messages_limit: int = 100, events_limit: int = 40):
-    """Detalhe do lead + transcript + timeline de eventos + notas."""
     ws = get_workspace_by_slug(slug)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace nao encontrado")
@@ -279,7 +301,6 @@ async def api_lead_detail(slug: str, lead_id: str, messages_limit: int = 100, ev
 
 @app.patch("/api/workspaces/{slug}/leads/{lead_id}", dependencies=[Depends(require_token)])
 async def api_patch_lead(slug: str, lead_id: str, payload: LeadPatchIn, claims: dict = Depends(require_token)):
-    """Atualiza estágio / dados / pausa do agente."""
     ws = get_workspace_by_slug(slug)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace nao encontrado")
@@ -304,12 +325,7 @@ async def api_patch_lead(slug: str, lead_id: str, payload: LeadPatchIn, claims: 
         if current != target:
             log_event(
                 "stage_changed",
-                {
-                    "from": current,
-                    "to": target,
-                    "source": "admin",
-                    "note": payload.note,
-                },
+                {"from": current, "to": target, "source": "admin", "note": payload.note},
                 lead_id=lead_id,
                 workspace_id=ws["id"],
             )
@@ -317,36 +333,25 @@ async def api_patch_lead(slug: str, lead_id: str, payload: LeadPatchIn, claims: 
     if payload.note and payload.stage is None:
         try:
             add_internal_note(
-                ws["id"],
-                lead_id,
-                payload.note,
-                author=(claims or {}).get("sub") or "admin",
+                ws["id"], lead_id, payload.note, author=(claims or {}).get("sub") or "admin"
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
 
     if payload.agent_paused is not None:
         set_agent_paused(
-            ws["id"],
-            lead_id,
-            payload.agent_paused,
-            by=(claims or {}).get("sub") or "admin",
+            ws["id"], lead_id, payload.agent_paused, by=(claims or {}).get("sub") or "admin"
         )
 
     if not fields and payload.note is None and payload.agent_paused is None:
         raise HTTPException(status_code=400, detail="Nada para atualizar")
 
     updated = update_lead_fields(ws["id"], lead_id, **fields) if fields else get_lead_by_id(ws["id"], lead_id)
-    log.info(
-        "lead patch",
-        extra={"workspace": slug, "lead": lead_id, "fields": list(fields.keys())},
-    )
     return _serialize_lead(updated or lead)
 
 
 @app.post("/api/workspaces/{slug}/leads/{lead_id}/notes", dependencies=[Depends(require_token)])
 async def api_add_note(slug: str, lead_id: str, body: NoteIn, claims: dict = Depends(require_token)):
-    """Adiciona nota interna no lead."""
     ws = get_workspace_by_slug(slug)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace nao encontrado")
@@ -355,10 +360,7 @@ async def api_add_note(slug: str, lead_id: str, body: NoteIn, claims: dict = Dep
         raise HTTPException(status_code=404, detail="Lead nao encontrado")
     try:
         entry = add_internal_note(
-            ws["id"],
-            lead_id,
-            body.note,
-            author=body.author or (claims or {}).get("sub") or "admin",
+            ws["id"], lead_id, body.note, author=body.author or (claims or {}).get("sub") or "admin"
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -367,32 +369,22 @@ async def api_add_note(slug: str, lead_id: str, body: NoteIn, claims: dict = Dep
 
 @app.post("/api/workspaces/{slug}/leads/{lead_id}/pause", dependencies=[Depends(require_token)])
 async def api_pause_agent(slug: str, lead_id: str, body: PauseIn | None = None, claims: dict = Depends(require_token)):
-    """Pausa ou retoma o agente (humano assume a conversa)."""
     ws = get_workspace_by_slug(slug)
     if not ws:
-        raise HTTPException(status_code=404, detail="Lead nao encontrado" if False else "Workspace nao encontrado")
+        raise HTTPException(status_code=404, detail="Workspace nao encontrado")
     lead = get_lead_by_id(ws["id"], lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead nao encontrado")
     paused = True if body is None else bool(body.paused)
     reason = body.reason if body else None
     updated = set_agent_paused(
-        ws["id"],
-        lead_id,
-        paused,
-        by=(claims or {}).get("sub") or "admin",
-        reason=reason,
+        ws["id"], lead_id, paused, by=(claims or {}).get("sub") or "admin", reason=reason
     )
-    return {
-        "ok": True,
-        "agent_paused": is_agent_paused(updated),
-        "lead": _serialize_lead(updated),
-    }
+    return {"ok": True, "agent_paused": is_agent_paused(updated), "lead": _serialize_lead(updated)}
 
 
 @app.get("/api/workspaces/{slug}/leads/{lead_id}/events", dependencies=[Depends(require_token)])
 async def api_lead_events(slug: str, lead_id: str, limit: int = 50):
-    """Timeline de eventos só deste lead."""
     ws = get_workspace_by_slug(slug)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace nao encontrado")
@@ -407,7 +399,7 @@ async def api_events(slug: str, limit: int = 50):
     ws = get_workspace_by_slug(slug)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace nao encontrado")
-    return list_recent_events(ws["id"], limit=limit)
+    return list_recent_events(ws["id"], limit=min(max(1, limit), 200))
 
 
 class ReviewIn(BaseModel):
@@ -477,7 +469,6 @@ async def api_apply(suggestion_id: str):
         status="applied",
         reviewed_at=datetime.now(UTC).isoformat(),
     )
-    log.info("prompt applied", extra={"workspace": str(row.get("workspace_id")), "event": row["agent"]})
     return {"ok": True, "override": override, "agent": row["agent"]}
 
 
@@ -490,7 +481,7 @@ async def api_run_learning(slug: str, per_outcome: int = 8):
     if not ws_row:
         raise HTTPException(status_code=404, detail="Workspace nao encontrado")
     ws = WorkspaceContext.from_row(ws_row)
-    return run_learning_for_workspace(ws, per_outcome=per_outcome)
+    return run_learning_for_workspace(ws, per_outcome=min(max(1, per_outcome), 20))
 
 
 if __name__ == "__main__":
@@ -499,12 +490,12 @@ if __name__ == "__main__":
     port = int(os.getenv("ADMIN_PORT", "8100"))
     if not auth_enabled():
         print("AVISO: auth desativada — defina ADMIN_PASSWORD (JWT) ou ADMIN_TOKEN.")
-    elif not (os.getenv("JWT_SECRET") or "").strip():
-        print("AVISO: JWT_SECRET nao definido — usando segredo de desenvolvimento.")
+    jwt_errs = assert_jwt_secret_safe()
+    for e in jwt_errs:
+        print(f"AVISO JWT: {e}")
     weak = assert_admin_password_policy()
     if weak:
         print("ERRO: ADMIN_PASSWORD fraca — login JWT bloqueado ate corrigir:")
         for err in weak:
             print(f"  - {err}")
-        print("Ex.: Admin!ForceIA2026x  |  ou FORCEIA_ALLOW_WEAK_PASSWORD=1 so em dev.")
     uvicorn.run(app, host="0.0.0.0", port=port)
