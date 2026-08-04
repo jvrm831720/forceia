@@ -2,6 +2,22 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [2.0.0]
+
+### Adicionado
+- **Playbook por workspace (Prioridade 1 — especialização dos agentes)**
+  - Módulo `agents/playbook.py` (schema, normalize, completeness, format para prompt)
+  - Coluna `workspaces.playbook` (`supabase/playbook.sql`) com fallback `metadata.playbook`
+  - Injeção automática no system prompt (SDR / Closer / Follow-up) via `build_system_prompt`
+  - API:
+    - `GET  /api/workspaces/{slug}/playbook`
+    - `PUT  /api/workspaces/{slug}/playbook`
+    - `GET  /api/workspaces/{slug}/playbook/template`
+  - Aba **Playbook** no console React (ICP, pricing, cases, objeções, tom, FAQ)
+  - Score de completude 0–100 (`ready` ≥ 50)
+  - Docs: `docs/PLAYBOOK.md`
+  - Testes: `agents/tests/test_playbook.py`
+
 ## [1.9.0]
 
 ### Adicionado

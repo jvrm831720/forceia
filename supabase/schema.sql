@@ -19,6 +19,7 @@ create table if not exists workspaces (
   plan text default 'completo',
   active boolean not null default true,
   metadata jsonb default '{}'::jsonb,
+  playbook jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -30,7 +31,7 @@ create index if not exists workspaces_evolution_instance_idx on workspaces (evol
 -- Leads / contatos (por workspace)
 create table if not exists leads (
   id uuid primary key default gen_random_uuid(),
-  workspace_id uuid not null references workspaces(id) on delete cascade,
+  workspace_id uuid not null references leads(id) on delete cascade,
   phone text not null,
   name text,
   company text,

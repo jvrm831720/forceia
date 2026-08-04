@@ -110,7 +110,7 @@ docs/              documentação
 
 [Setup](docs/SETUP.md) · [Deploy](docs/DEPLOY.md) · [Admin](docs/ADMIN.md) ·
 [Multi-tenant](docs/MULTI_TENANT.md) · [Supabase](docs/SUPABASE.md) ·
-[Twenty](docs/TWENTY.md) · [Integrações](docs/INTEGRATIONS.md) · [Follow-up](docs/FOLLOWUP.md) · [Arquitetura](docs/ARCHITECTURE.md)
+[Twenty](docs/TWENTY.md) · [Integrações](docs/INTEGRATIONS.md) · [Follow-up](docs/FOLLOWUP.md) · [Playbook](docs/PLAYBOOK.md) · [Arquitetura](docs/ARCHITECTURE.md)
 
 ## Roadmap
 
@@ -121,6 +121,7 @@ docs/              documentação
 - [x] Testes + CI
 - [x] Dockerfile + deploy documentado
 - [x] Camada de integrações Fase 0+1 (Composio session/authorize/API) — ver docs/INTEGRATIONS.md
+- [x] Playbook por workspace (ICP, pricing, cases, tom → system prompt)
 - [ ] Agendamento real (Calendar tool no Closer) e triggers
 - [ ] Billing por plano (Asaas/Stripe)
 - [ ] Testes E2E com mensagem real
