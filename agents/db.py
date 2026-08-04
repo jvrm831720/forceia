@@ -27,8 +27,6 @@ def get_client() -> Client:
     return _client
 
 
-# ---------- Workspaces ----------
-
 def get_workspace_by_id(workspace_id: str) -> dict | None:
     result = get_client().table("workspaces").select("*").eq("id", workspace_id).limit(1).execute()
     return result.data[0] if result.data else None
@@ -76,8 +74,6 @@ def create_workspace(name: str, slug: str, **fields: Any) -> dict:
     return result.data[0] if result.data else payload
 
 
-# ---------- Leads ----------
-
 def upsert_lead(workspace_id: str, phone: str, **fields: Any) -> dict:
     client = get_client()
     payload = {
@@ -88,6 +84,20 @@ def upsert_lead(workspace_id: str, phone: str, **fields: Any) -> dict:
     payload["last_message_at"] = datetime.now(UTC).isoformat()
     result = client.table("leads").upsert(payload, on_conflict="workspace_id,phone").execute()
     return result.data[0] if result.data else payload
+
+
+def get_lead_by_id(workspace_id: str, lead_id: str) -> dict | None:
+    """Lead por id, garantindo pertencer ao workspace (multi-tenant)."""
+    result = (
+        get_client()
+        .table("leads")
+        .select("*")
+        .eq("workspace_id", workspace_id)
+        .eq("id", lead_id)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
 
 
 def get_lead_by_phone(workspace_id: str, phone: str) -> dict | None:
@@ -149,8 +159,6 @@ def merge_metadata(workspace_id: str, phone: str, extra: dict) -> dict:
     return upsert_lead(workspace_id, phone, metadata=meta)
 
 
-# ---------- Idempotencia de mensagens ----------
-
 def was_message_processed(workspace_id: str, message_id: str) -> bool:
     if not message_id:
         return False
@@ -180,8 +188,6 @@ def mark_message_processed(
     )
 
 
-# ---------- Consultas para o painel admin ----------
-
 def count_leads_by_stage(workspace_id: str) -> dict[str, int]:
     result = (
         get_client()
@@ -201,7 +207,7 @@ def list_leads(workspace_id: str, limit: int = 100) -> list[dict]:
     result = (
         get_client()
         .table("leads")
-        .select("id, phone, name, company, stage, last_message_at, updated_at, metadata")
+        .select("id, phone, name, company, email, stage, bant, last_message_at, updated_at, metadata")
         .eq("workspace_id", workspace_id)
         .order("updated_at", desc=True)
         .limit(limit)
@@ -223,8 +229,6 @@ def list_recent_events(workspace_id: str, limit: int = 50) -> list[dict]:
     return result.data or []
 
 
-# ---------- Learning / auto-melhoria ----------
-
 def list_leads_by_stage(workspace_id: str, stage: str, limit: int = 20) -> list[dict]:
     result = (
         get_client()
@@ -239,7 +243,7 @@ def list_leads_by_stage(workspace_id: str, stage: str, limit: int = 20) -> list[
     return result.data or []
 
 
-def get_messages_for_lead(lead_id: str, limit: int = 40) -> list[dict]:
+def get_messages_for_lead(lead_id: str, limit: int = 100) -> list[dict]:
     result = (
         get_client()
         .table("messages")
