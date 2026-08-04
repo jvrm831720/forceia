@@ -1,84 +1,52 @@
 # ForceIA — Codebase Map
 
-> **Mapa vivo do repositório.** Última revisão: **2026-08-04** · Versão: **2.2.0 (P4)**
+> Última revisão: **2026-08-04** · Versão: **2.3.0 (Skills de elite)**
 
-Objetivo: cada empresa sente que tem o **melhor SDR**, **melhor Closer** e **melhor Follow-up** por lead — com **confiança** (não inventa preço/prazo).
-
----
-
-## 1. Visão geral
-
-| Item | Valor |
-|------|--------|
-| Repo | https://github.com/jvrm831720/forceia |
-| Agentes | SDR → Closer → Follow-up |
-| Canal | Evolution API |
-| Dados | Supabase multi-tenant |
-| Painel | FastAPI + React |
+Objetivo: melhor SDR / Closer / Follow-up **por lead**, com playbook, inteligência, produto, confiança e **skills de prospecting de elite**.
 
 ---
 
-## 2. Árvore (P1–P4)
+## Prioridades
 
-```
-agents/
-  playbook.py                         # P1
-  lead_score, intent, enrichment,
-  closer_tools, elite_routes          # P2
-  performance, owner_reports,
-  playground, product_routes          # P3
-  guardrails.py                       # P4 — preço/prazo
-  ab_testing.py                       # P4 — A/B conversão
-  handoff.py                          # P4 — resumo + notify
-  trust_routes.py                     # P4 API
-  intelligence.py                     # + guardrails no prompt
-  run_sdr.py                          # + guardrails, A/B, handoff
-docs/
-  PLAYBOOK · ELITE · PRODUCT · TRUST.md
-```
+| P | Tema | Status |
+|---|------|--------|
+| 1 | Playbook | ✅ |
+| 2 | Elite (score/intent/enrich/calendar) | ✅ API · wire graph ⏳ |
+| 3 | Product UX | ✅ |
+| 4 | Trust (guardrails, A/B, handoff) | ✅ |
+| **Skills** | ICP fit, personalization, pre-call, revival, pipeline | ✅ |
 
 ---
 
-## 3. Linha do tempo
+## Skills (`agents/skills/`)
 
-| Prioridade | Status |
-|------------|--------|
-| P1 Playbook | ✅ |
-| P2 Elite (API; wire graph ⏳) | ✅ módulos |
-| P3 Product UX | ✅ |
-| **P4 Confiabilidade** | ✅ |
+Injetadas no **system prompt** via `intelligence.build_system_prompt`:
 
-### P4 — detalhes
+- `icp_fit` — score 1–100 + grade
+- `personalization` — openers SDR
+- `pre_call` — brief Closer
+- `revival` — reativação lost
+- `pipeline_health` — Hot/Warm/Cold/At Risk
 
-| # | Feature | Módulo |
-|---|---------|--------|
-| 13 | Guardrails (não inventar preço/prazo) | `guardrails.py` |
-| 14 | A/B prompts + conversão | `ab_testing.py` |
-| 15 | Handoff suave (resumo + WhatsApp) | `handoff.py` |
+API: `GET /api/skills` · `GET /api/workspaces/{slug}/leads/{id}/skills`
 
-**APIs P4**
-- `GET  /api/workspaces/{slug}/ab-report`
-- `POST /api/workspaces/{slug}/leads/{id}/handoff`
-- `POST /api/workspaces/{slug}/guardrails/scan`
+Docs: `docs/SKILLS.md`
 
 ---
 
-## 4. Runtime (legado)
+## Stack
 
-```
-lead → assign A/B → prompt variante → LLM
-     → split META → enforce_guardrails
-     → se handoff: pause + notify humano
-     → persist + WhatsApp
-```
+WhatsApp (Evolution) → LangGraph/legado → playbook + guardrails + **skills** + META → Supabase
+
+Painel: FastAPI `:8100` + React `web/`
 
 ---
 
-## 5. Roadmap aberto
+## Roadmap aberto
 
-- Wire LangGraph P2 no fluxo WhatsApp
-- UI hot-leads / A/B no painel
-- Cron relatório dono
+- Wire LangGraph completo (P2 + skills)
+- UI badges ICP/health no console
+- List building em massa (Composio/Twenty)
 - Billing · E2E
 
 ---
