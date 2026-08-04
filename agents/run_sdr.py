@@ -1,5 +1,6 @@
 """
-ForceIA - Runtime multi-tenant dos agentes (inteligencia + BANT + META + playbook).
+ForceIA - Runtime multi-tenant dos agentes
+(inteligencia + BANT + META + playbook + guardrails + A/B + handoff).
 """
 
 from __future__ import annotations
@@ -76,8 +77,9 @@ def build_messages(
     workspace_name: str,
     workspace_id: str | None = None,
     playbook: dict | None = None,
+    base_prompt: str | None = None,
 ) -> list[dict]:
-    base = load_prompt(agent, workspace_id=workspace_id)
+    base = base_prompt if base_prompt is not None else load_prompt(agent, workspace_id=workspace_id)
     system = build_system_prompt(
         base,
         lead,
@@ -104,6 +106,7 @@ def generate_reply(
     *,
     lead: dict | None = None,
     trace: Any = None,
+    base_prompt: str | None = None,
 ) -> str:
     """Gera resposta bruta do modelo (pode conter ---META---)."""
     if not ws.openai_api_key:
@@ -119,6 +122,7 @@ def generate_reply(
         workspace_name=ws.name or "ForceIA",
         workspace_id=ws.id,
         playbook=playbook,
+        base_prompt=base_prompt,
     )
     model = ws.gpt_model
     temperature = _AGENT_TEMPERATURE.get(agent, 0.6)
@@ -244,6 +248,9 @@ def _handle_incoming_legacy(
     send: bool = True,
     message_id: str | None = None,
 ) -> str:
+    from ab_testing import ensure_lead_variant, record_ab_exposure, resolve_prompt_for_variant
+    from guardrails import enforce_guardrails
+
     ws = workspace
     lead = get_lead_by_phone(ws.id, number)
     if not lead:
@@ -251,6 +258,12 @@ def _handle_incoming_legacy(
         log_event("lead_created", {"phone": number}, lead_id=lead["id"], workspace_id=ws.id)
         log.info("lead criado", extra={"workspace": ws.slug, "phone": number})
         sync_twenty(ws, lead)
+
+    # A/B variant estável por lead
+    ab_meta, ab_variant = ensure_lead_variant(lead, ws.id)
+    if ab_meta.get("ab_variant") != (lead.get("metadata") or {}).get("ab_variant"):
+        merge_metadata(ws.id, number, {"ab_variant": ab_variant})
+        lead = get_lead_by_phone(ws.id, number) or lead
 
     if is_agent_paused(lead):
         add_message(lead["id"], "user", text)
@@ -275,17 +288,50 @@ def _handle_incoming_legacy(
     else:
         agent = next_agent_for_stage(stage)
 
+    prompt_text, prompt_source = resolve_prompt_for_variant(
+        agent=agent,
+        variant=ab_variant,
+        workspace_id=ws.id,
+        load_prompt_fn=load_prompt,
+    )
+    record_ab_exposure(
+        workspace_id=ws.id,
+        lead_id=lead.get("id"),
+        variant=ab_variant,
+        agent=agent,
+        source=prompt_source,
+    )
+
     history_rows = get_history(lead["id"], limit=24)
     history = [{"role": r["role"], "content": r["content"]} for r in history_rows]
 
-    raw_reply = generate_reply(ws, agent, history, text, lead=lead)
+    raw_reply = generate_reply(
+        ws, agent, history, text, lead=lead, base_prompt=prompt_text
+    )
     visible, meta = split_reply_and_meta(raw_reply)
     reply = strip_control_blocks(visible)
+
+    # Guardrails pós-resposta
+    playbook = extract_playbook_from_workspace(ws.raw)
+    guarded = enforce_guardrails(reply, playbook=playbook, strict=True)
+    if guarded.get("modified"):
+        reply = guarded["reply"]
+        log_event(
+            "guardrail_enforced",
+            {
+                "issues": guarded.get("issues"),
+                "has_price_risk": guarded.get("has_price_risk"),
+                "has_deadline_risk": guarded.get("has_deadline_risk"),
+            },
+            lead_id=lead["id"],
+            workspace_id=ws.id,
+        )
 
     field_updates = apply_meta_to_lead_fields(lead, meta, text)
     new_stage = stage_from_meta_or_tags(raw_reply, meta, stage, can_transition)
     new_stage = _maybe_auto_qualify(stage, field_updates.get("bant") or lead.get("bant"), new_stage)
 
+    handoff_done = False
     if meta.get("handoff"):
         log_event(
             "handoff_requested",
@@ -298,6 +344,27 @@ def _handle_incoming_legacy(
                 (reply + "\n\n" if reply else "")
                 + "Vou acionar alguém do time para te atender em seguida, combinado?"
             ).strip()
+        try:
+            from handoff import execute_handoff
+
+            # atualiza lead em memória com fields já parseados
+            lead_for_handoff = dict(lead)
+            if field_updates.get("bant"):
+                lead_for_handoff["bant"] = field_updates["bant"]
+            if field_updates.get("metadata"):
+                m = dict(lead_for_handoff.get("metadata") or {})
+                m.update(field_updates["metadata"])
+                lead_for_handoff["metadata"] = m
+            execute_handoff(
+                workspace=ws.raw if isinstance(ws.raw, dict) else {"id": ws.id, "name": ws.name, "slug": ws.slug, "metadata": {}},
+                lead=lead_for_handoff,
+                reason=str(meta.get("intent") or meta.get("notes") or "agente solicitou handoff"),
+                notify=True,
+                by="agent",
+            )
+            handoff_done = True
+        except Exception as exc:
+            log.warning("handoff falhou: %s", exc, extra={"workspace": ws.slug})
 
     add_message(lead["id"], "user", text)
     add_message(lead["id"], "assistant", reply, agent=agent)
@@ -307,7 +374,7 @@ def _handle_incoming_legacy(
     upsert_kwargs = {k: v for k, v in field_updates.items() if k != "metadata"}
     if field_updates.get("metadata"):
         merge_metadata(ws.id, number, field_updates["metadata"])
-    if new_stage != stage:
+    if new_stage != stage and not handoff_done:
         upsert_kwargs["stage"] = new_stage
         lead = set_stage(ws.id, number, new_stage)
         if upsert_kwargs:
