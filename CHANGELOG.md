@@ -2,51 +2,42 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [2.2.0] — Prioridade 4 · Confiabilidade e confiança
+
+### Adicionado
+- **Guardrails** (`agents/guardrails.py`)
+  - Instrução no system prompt: nunca inventar preço/prazo
+  - Scan + sanitização pós-resposta no runtime
+  - `POST /api/workspaces/{slug}/guardrails/scan`
+  - Evento `guardrail_enforced`
+- **A/B de prompts** (`agents/ab_testing.py`)
+  - Variante A/B estável por lead (hash phone)
+  - Override opcional `sdr_b` / `closer_b` / `followup_b`
+  - `GET /api/workspaces/{slug}/ab-report` (conversão + lift)
+  - Env `FORCEIA_AB_TESTING`
+- **Handoff humano suave** (`agents/handoff.py`)
+  - Resumo BANT + intent + últimas msgs
+  - Pausa agente + notifica WhatsApp (`handoff_phone` / `owner_phone`)
+  - `POST /api/workspaces/{slug}/leads/{id}/handoff`
+  - Wire automático quando META `handoff: true`
+- Docs: `docs/TRUST.md` · testes `agents/tests/test_trust.py`
+- `trust_routes.py` montado no admin
+
 ## [2.1.0] — Prioridade 3 · Experiência de produto
 
-### Adicionado
-- **Dashboard de performance** (`agents/performance.py`)
-  - Headline: “Seu SDR de IA agendou X reuniões esta semana”
-  - Comparativo IA vs humano (reuniões, qualificações, fechamentos)
-  - `GET /api/workspaces/{slug}/performance?period=week|day|month`
-- **Relatório WhatsApp para o dono** (`agents/owner_reports.py`)
-  - Preview + envio via Evolution
-  - `GET .../reports/preview` · `POST .../reports/send`
-  - `PUT .../owner-phone` → `metadata.owner_phone`
-- **Playground** (`agents/playground.py`)
-  - Simula SDR/Closer com lead fictício (não grava no funil)
-  - `POST /api/workspaces/{slug}/playground`
-- **UI premium**
-  - Abas Time · Performance · Playground
-  - `PerformancePanel.tsx` · `PlaygroundPanel.tsx` · `product.css`
-  - Copy “painel de time de vendas / empresas”
-- Docs: `docs/PRODUCT.md` · testes `agents/tests/test_product.py`
-- `product_routes.py` montado em `integrations/admin_routes.py`
+- Performance dashboard (reuniões + IA vs humano)
+- Relatório WhatsApp para o dono
+- Playground de simulação
+- UI premium (painel de time de vendas)
 
-## [2.0.0]
+## [2.0.0] — Prioridade 1 · Playbook
 
-### Adicionado
-- **Playbook por workspace (Prioridade 1)**
-  - `agents/playbook.py`, coluna `workspaces.playbook`, API GET/PUT/template
-  - Aba Playbook no console + score de completude
-  - Docs: `docs/PLAYBOOK.md`
+- Playbook por workspace no system prompt + aba no console
 
-## [1.9.0]
+## [1.9.0] — Integrações Composio
 
-### Adicionado
-- Camada de integrações Composio (session, authorize, admin API)
+## [1.8.0] — Notes, timeline, pause agente
 
-## [1.8.0]
+## [1.7.x] — Lead detail + transcript
 
-### Adicionado
-- Notas internas, timeline de eventos, assumir/pausar agente
-
-## [1.7.x]
-
-### Adicionado
-- Tela de lead + transcript e melhorias de UI
-
-## [1.6.0]
-
-### Adicionado
-- Auth JWT no painel admin
+## [1.6.0] — Auth JWT
