@@ -2,6 +2,18 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.7.1]
+
+### Adicionado
+- **Melhorias na tela de lead + transcript**:
+  - Busca por telefone/nome/empresa e filtro por estágio na lista
+  - `PATCH /api/workspaces/{slug}/leads/{lead_id}` para mudar estágio (e name/company/email)
+  - Evento `stage_changed` com source=admin
+  - `update_lead_fields` multi-tenant em `db.py`
+  - Auto-scroll do transcript, cores por agente (SDR/Closer/Follow-up)
+  - Badge de estágio, link WhatsApp, Esc fecha detalhe, BANT "não coletado"
+  - Contador filtrado e botão Atualizar no detalhe
+
 ## [1.7.0]
 
 ### Adicionado
