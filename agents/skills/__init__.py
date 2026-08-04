@@ -8,11 +8,16 @@ mensagens + score nativo.
 
 from __future__ import annotations
 
+from skills.hiring_signal import (
+    analyze_hiring_signal,
+    format_hiring_signal_for_prompt,
+    hiring_signal_from_lead,
+)
 from skills.icp_fit import compute_icp_fit, format_icp_for_prompt
 from skills.personalization import build_personalization_brief, format_personalization_for_prompt
+from skills.pipeline_health import score_pipeline_lead, format_pipeline_for_prompt
 from skills.pre_call import build_pre_call_brief, format_pre_call_for_prompt
 from skills.revival import score_revival, format_revival_for_prompt
-from skills.pipeline_health import score_pipeline_lead, format_pipeline_for_prompt
 
 SKILL_CATALOG = [
     {
@@ -45,6 +50,12 @@ SKILL_CATALOG = [
         "description": "Saúde do lead no funil + ação prioritária",
         "module": "skills.pipeline_health",
     },
+    {
+        "id": "hiring_signal_prospector",
+        "name": "Hiring Signal Prospector",
+        "description": "Vagas como intent: força do sinal, dor, opener para decision-maker",
+        "module": "skills.hiring_signal",
+    },
 ]
 
 
@@ -66,6 +77,11 @@ def build_skills_context(
     icp = format_icp_for_prompt(lead, playbook)
     if icp:
         parts.append(icp)
+
+    # Hiring signal tem prioridade alta na abertura do SDR
+    hiring = format_hiring_signal_for_prompt(lead, playbook)
+    if hiring:
+        parts.append(hiring)
 
     if agent == "sdr" or stage in ("sdr", "qualified"):
         pers = format_personalization_for_prompt(lead, playbook)
@@ -98,4 +114,6 @@ __all__ = [
     "build_pre_call_brief",
     "score_revival",
     "score_pipeline_lead",
+    "analyze_hiring_signal",
+    "hiring_signal_from_lead",
 ]
