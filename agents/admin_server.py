@@ -29,17 +29,21 @@ from auth import (
     verify_password,
 )
 from db import (
+    add_internal_note,
     count_leads_by_stage,
     create_workspace,
     get_lead_by_id,
     get_messages_for_lead,
     get_prompt_suggestion,
     get_workspace_by_slug,
+    is_agent_paused,
     list_active_workspaces,
+    list_events_for_lead,
     list_leads,
     list_prompt_suggestions,
     list_recent_events,
     log_event,
+    set_agent_paused,
     update_lead_fields,
     update_prompt_suggestion,
     upsert_prompt_override,
@@ -57,7 +61,7 @@ load_dotenv()
 
 log = get_logger("forceia.admin")
 
-APP_VERSION = "1.7.1"
+APP_VERSION = "1.8.0"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 
@@ -79,6 +83,17 @@ class LeadPatchIn(BaseModel):
     company: str | None = None
     email: str | None = None
     note: str | None = Field(default=None, description="Nota interna opcional (vai para events)")
+    agent_paused: bool | None = None
+
+
+class NoteIn(BaseModel):
+    note: str = Field(min_length=1, max_length=4000)
+    author: str | None = None
+
+
+class PauseIn(BaseModel):
+    paused: bool = True
+    reason: str | None = None
 
 
 @app.get("/", include_in_schema=False)
@@ -205,9 +220,28 @@ async def api_leads(slug: str, limit: int = 100):
     return list_leads(ws["id"], limit=limit)
 
 
+def _serialize_lead(lead: dict) -> dict:
+    meta = lead.get("metadata") or {}
+    return {
+        "id": lead.get("id"),
+        "phone": lead.get("phone"),
+        "name": lead.get("name"),
+        "company": lead.get("company"),
+        "email": lead.get("email"),
+        "stage": lead.get("stage"),
+        "bant": lead.get("bant") or {},
+        "metadata": meta,
+        "agent_paused": is_agent_paused(lead),
+        "notes": list(meta.get("notes") or []),
+        "last_message_at": lead.get("last_message_at"),
+        "updated_at": lead.get("updated_at"),
+        "created_at": lead.get("created_at"),
+    }
+
+
 @app.get("/api/workspaces/{slug}/leads/{lead_id}", dependencies=[Depends(require_token)])
-async def api_lead_detail(slug: str, lead_id: str, messages_limit: int = 100):
-    """Detalhe do lead + transcript (mensagens ordenadas)."""
+async def api_lead_detail(slug: str, lead_id: str, messages_limit: int = 100, events_limit: int = 40):
+    """Detalhe do lead + transcript + timeline de eventos + notas."""
     ws = get_workspace_by_slug(slug)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace nao encontrado")
@@ -229,28 +263,19 @@ async def api_lead_detail(slug: str, lead_id: str, messages_limit: int = 100):
                 "created_at": m.get("created_at"),
             }
         )
+    ev_limit = max(1, min(int(events_limit or 40), 200))
+    events = list_events_for_lead(lead_id, limit=ev_limit)
     return {
-        "lead": {
-            "id": lead.get("id"),
-            "phone": lead.get("phone"),
-            "name": lead.get("name"),
-            "company": lead.get("company"),
-            "email": lead.get("email"),
-            "stage": lead.get("stage"),
-            "bant": lead.get("bant") or {},
-            "metadata": lead.get("metadata") or {},
-            "last_message_at": lead.get("last_message_at"),
-            "updated_at": lead.get("updated_at"),
-            "created_at": lead.get("created_at"),
-        },
+        "lead": _serialize_lead(lead),
         "messages": transcript,
         "message_count": len(transcript),
+        "events": events,
     }
 
 
 @app.patch("/api/workspaces/{slug}/leads/{lead_id}", dependencies=[Depends(require_token)])
-async def api_patch_lead(slug: str, lead_id: str, payload: LeadPatchIn):
-    """Atualiza estágio / dados básicos do lead (manual no console)."""
+async def api_patch_lead(slug: str, lead_id: str, payload: LeadPatchIn, claims: dict = Depends(require_token)):
+    """Atualiza estágio / dados / pausa do agente."""
     ws = get_workspace_by_slug(slug)
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace nao encontrado")
@@ -271,7 +296,6 @@ async def api_patch_lead(slug: str, lead_id: str, payload: LeadPatchIn):
         if target not in STAGES:
             raise HTTPException(status_code=400, detail=f"Estágio inválido. Use: {', '.join(STAGES)}")
         current = (lead.get("stage") or "sdr").lower()
-        # Admin pode forçar qualquer estágio (override operacional)
         fields["stage"] = target
         if current != target:
             log_event(
@@ -287,31 +311,91 @@ async def api_patch_lead(slug: str, lead_id: str, payload: LeadPatchIn):
             )
 
     if payload.note and payload.stage is None:
-        log_event(
-            "admin_note",
-            {"note": payload.note},
-            lead_id=lead_id,
-            workspace_id=ws["id"],
+        try:
+            add_internal_note(
+                ws["id"],
+                lead_id,
+                payload.note,
+                author=(claims or {}).get("sub") or "admin",
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+
+    if payload.agent_paused is not None:
+        set_agent_paused(
+            ws["id"],
+            lead_id,
+            payload.agent_paused,
+            by=(claims or {}).get("sub") or "admin",
         )
 
-    if not fields and not payload.note:
+    if not fields and payload.note is None and payload.agent_paused is None:
         raise HTTPException(status_code=400, detail="Nada para atualizar")
 
-    updated = update_lead_fields(ws["id"], lead_id, **fields) if fields else lead
+    updated = update_lead_fields(ws["id"], lead_id, **fields) if fields else get_lead_by_id(ws["id"], lead_id)
     log.info(
         "lead patch",
         extra={"workspace": slug, "lead": lead_id, "fields": list(fields.keys())},
     )
+    return _serialize_lead(updated or lead)
+
+
+@app.post("/api/workspaces/{slug}/leads/{lead_id}/notes", dependencies=[Depends(require_token)])
+async def api_add_note(slug: str, lead_id: str, body: NoteIn, claims: dict = Depends(require_token)):
+    """Adiciona nota interna no lead."""
+    ws = get_workspace_by_slug(slug)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace nao encontrado")
+    lead = get_lead_by_id(ws["id"], lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead nao encontrado")
+    try:
+        entry = add_internal_note(
+            ws["id"],
+            lead_id,
+            body.note,
+            author=body.author or (claims or {}).get("sub") or "admin",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"ok": True, "note": entry}
+
+
+@app.post("/api/workspaces/{slug}/leads/{lead_id}/pause", dependencies=[Depends(require_token)])
+async def api_pause_agent(slug: str, lead_id: str, body: PauseIn | None = None, claims: dict = Depends(require_token)):
+    """Pausa ou retoma o agente (humano assume a conversa)."""
+    ws = get_workspace_by_slug(slug)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace nao encontrado")
+    lead = get_lead_by_id(ws["id"], lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead nao encontrado")
+    paused = True if body is None else bool(body.paused)
+    reason = body.reason if body else None
+    updated = set_agent_paused(
+        ws["id"],
+        lead_id,
+        paused,
+        by=(claims or {}).get("sub") or "admin",
+        reason=reason,
+    )
     return {
-        "id": updated.get("id"),
-        "phone": updated.get("phone"),
-        "name": updated.get("name"),
-        "company": updated.get("company"),
-        "email": updated.get("email"),
-        "stage": updated.get("stage"),
-        "bant": updated.get("bant") or {},
-        "updated_at": updated.get("updated_at"),
+        "ok": True,
+        "agent_paused": is_agent_paused(updated),
+        "lead": _serialize_lead(updated),
     }
+
+
+@app.get("/api/workspaces/{slug}/leads/{lead_id}/events", dependencies=[Depends(require_token)])
+async def api_lead_events(slug: str, lead_id: str, limit: int = 50):
+    """Timeline de eventos só deste lead."""
+    ws = get_workspace_by_slug(slug)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace nao encontrado")
+    lead = get_lead_by_id(ws["id"], lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead nao encontrado")
+    return list_events_for_lead(lead_id, limit=max(1, min(limit, 200)))
 
 
 @app.get("/api/workspaces/{slug}/events", dependencies=[Depends(require_token)])
