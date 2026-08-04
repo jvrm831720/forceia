@@ -39,6 +39,8 @@ from db import (
     list_leads,
     list_prompt_suggestions,
     list_recent_events,
+    log_event,
+    update_lead_fields,
     update_prompt_suggestion,
     upsert_prompt_override,
 )
@@ -48,14 +50,14 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from logging_config import get_logger
-from pydantic import BaseModel
-from state_machine import STAGES
+from pydantic import BaseModel, Field
+from state_machine import STAGES, can_transition
 
 load_dotenv()
 
 log = get_logger("forceia.admin")
 
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.7.1"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 
@@ -69,6 +71,14 @@ class WorkspaceIn(BaseModel):
     slug: str
     instance: str | None = None
     plan: str = "completo"
+
+
+class LeadPatchIn(BaseModel):
+    stage: str | None = None
+    name: str | None = None
+    company: str | None = None
+    email: str | None = None
+    note: str | None = Field(default=None, description="Nota interna opcional (vai para events)")
 
 
 @app.get("/", include_in_schema=False)
@@ -235,6 +245,72 @@ async def api_lead_detail(slug: str, lead_id: str, messages_limit: int = 100):
         },
         "messages": transcript,
         "message_count": len(transcript),
+    }
+
+
+@app.patch("/api/workspaces/{slug}/leads/{lead_id}", dependencies=[Depends(require_token)])
+async def api_patch_lead(slug: str, lead_id: str, payload: LeadPatchIn):
+    """Atualiza estágio / dados básicos do lead (manual no console)."""
+    ws = get_workspace_by_slug(slug)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace nao encontrado")
+    lead = get_lead_by_id(ws["id"], lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead nao encontrado")
+
+    fields: dict = {}
+    if payload.name is not None:
+        fields["name"] = payload.name.strip() or None
+    if payload.company is not None:
+        fields["company"] = payload.company.strip() or None
+    if payload.email is not None:
+        fields["email"] = payload.email.strip() or None
+
+    if payload.stage is not None:
+        target = payload.stage.strip().lower()
+        if target not in STAGES:
+            raise HTTPException(status_code=400, detail=f"Estágio inválido. Use: {', '.join(STAGES)}")
+        current = (lead.get("stage") or "sdr").lower()
+        # Admin pode forçar qualquer estágio (override operacional)
+        fields["stage"] = target
+        if current != target:
+            log_event(
+                "stage_changed",
+                {
+                    "from": current,
+                    "to": target,
+                    "source": "admin",
+                    "note": payload.note,
+                },
+                lead_id=lead_id,
+                workspace_id=ws["id"],
+            )
+
+    if payload.note and payload.stage is None:
+        log_event(
+            "admin_note",
+            {"note": payload.note},
+            lead_id=lead_id,
+            workspace_id=ws["id"],
+        )
+
+    if not fields and not payload.note:
+        raise HTTPException(status_code=400, detail="Nada para atualizar")
+
+    updated = update_lead_fields(ws["id"], lead_id, **fields) if fields else lead
+    log.info(
+        "lead patch",
+        extra={"workspace": slug, "lead": lead_id, "fields": list(fields.keys())},
+    )
+    return {
+        "id": updated.get("id"),
+        "phone": updated.get("phone"),
+        "name": updated.get("name"),
+        "company": updated.get("company"),
+        "email": updated.get("email"),
+        "stage": updated.get("stage"),
+        "bant": updated.get("bant") or {},
+        "updated_at": updated.get("updated_at"),
     }
 
 
