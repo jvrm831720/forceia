@@ -100,6 +100,26 @@ def get_lead_by_id(workspace_id: str, lead_id: str) -> dict | None:
     return result.data[0] if result.data else None
 
 
+def update_lead_fields(workspace_id: str, lead_id: str, **fields: Any) -> dict:
+    """Atualiza campos do lead com guard multi-tenant."""
+    payload = {k: v for k, v in fields.items() if v is not None}
+    if not payload:
+        lead = get_lead_by_id(workspace_id, lead_id)
+        return lead or {}
+    payload["updated_at"] = datetime.now(UTC).isoformat()
+    result = (
+        get_client()
+        .table("leads")
+        .update(payload)
+        .eq("workspace_id", workspace_id)
+        .eq("id", lead_id)
+        .execute()
+    )
+    if result.data:
+        return result.data[0]
+    return get_lead_by_id(workspace_id, lead_id) or payload
+
+
 def get_lead_by_phone(workspace_id: str, phone: str) -> dict | None:
     result = (
         get_client()
