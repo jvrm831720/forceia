@@ -89,6 +89,35 @@ def update_workspace_metadata(workspace_id: str, extra: dict) -> dict:
     return (result.data[0].get("metadata") if result.data else meta) or meta
 
 
+def update_workspace_playbook(workspace_id: str, playbook: dict) -> dict:
+    """Persiste playbook normalizado na coluna playbook (fallback metadata)."""
+    from playbook import normalize_playbook
+
+    normalized = normalize_playbook(playbook)
+    client = get_client()
+    try:
+        result = (
+            client.table("workspaces")
+            .update({"playbook": normalized})
+            .eq("id", workspace_id)
+            .execute()
+        )
+        if result.data:
+            return normalize_playbook(result.data[0].get("playbook"))
+    except Exception:
+        # Coluna ainda nao migrada: grava em metadata.playbook
+        meta = update_workspace_metadata(workspace_id, {"playbook": normalized})
+        return normalize_playbook(meta.get("playbook") if isinstance(meta, dict) else normalized)
+    return normalized
+
+
+def get_workspace_playbook(workspace_id: str) -> dict:
+    from playbook import extract_playbook_from_workspace
+
+    row = get_workspace_by_id(workspace_id)
+    return extract_playbook_from_workspace(row)
+
+
 def create_workspace(name: str, slug: str, **fields: Any) -> dict:
     payload = {"name": name, "slug": slug, **{k: v for k, v in fields.items() if v is not None}}
     result = get_client().table("workspaces").insert(payload).execute()

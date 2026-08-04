@@ -2,7 +2,7 @@
 ForceIA - Camada de inteligencia dos agentes.
 
 - Extrai BANT, nome, empresa, email e intencao a partir da conversa
-- Monta contexto rico para o system prompt
+- Monta contexto rico para o system prompt (lead + playbook)
 - Parseia bloco ---META--- (JSON) retornado pelo LLM
 - Calcula score de qualificacao
 """
@@ -216,8 +216,16 @@ def apply_meta_to_lead_fields(lead: dict, meta: dict, user_text: str) -> dict[st
     return updates
 
 
-def build_system_prompt(base_prompt: str, lead: dict, workspace_name: str) -> str:
+def build_system_prompt(
+    base_prompt: str,
+    lead: dict,
+    workspace_name: str,
+    playbook: dict | None = None,
+) -> str:
+    from playbook import format_playbook_for_prompt
+
     context = build_lead_context(lead, workspace_name=workspace_name)
+    playbook_block = format_playbook_for_prompt(playbook)
     protocol = """
 ## Protocolo interno (obrigatorio)
 
@@ -233,4 +241,10 @@ Regras do META:
 - O lead NAO deve ver o bloco ---META--- (ele e removido automaticamente).
 - Mensagem ao lead: curta, WhatsApp, portugues brasileiro.
 """.strip()
-    return f"{base_prompt.strip()}\n\n## Contexto deste lead\n{context}\n\n{protocol}"
+
+    parts = [base_prompt.strip()]
+    if playbook_block:
+        parts.append(playbook_block)
+    parts.append(f"## Contexto deste lead\n{context}")
+    parts.append(protocol)
+    return "\n\n".join(parts)
