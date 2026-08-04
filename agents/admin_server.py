@@ -1,9 +1,12 @@
 """
 ForceIA - Painel Admin (API + dashboard)
 
-Endpoints protegidos por token (Authorization: Bearer <ADMIN_TOKEN>
-ou header X-Admin-Token). Definir ADMIN_TOKEN no .env e obrigatorio
-para ligar o painel (caso contrario as rotas retornam 503).
+Auth JWT (recomendado):
+  POST /api/auth/login  {username, password} -> access_token
+  Authorization: Bearer <jwt>
+
+Legado: ADMIN_TOKEN ainda aceito via Bearer ou X-Admin-Token.
+Defina ADMIN_PASSWORD (+ JWT_SECRET) ou ADMIN_TOKEN no .env.
 
   cd agents
   python admin_server.py            # sobe em http://localhost:8100
@@ -15,6 +18,16 @@ import os
 import secrets
 from pathlib import Path
 
+from auth import (
+    LoginIn,
+    TokenOut,
+    assert_admin_password_policy,
+    auth_enabled,
+    create_access_token,
+    require_auth,
+    validate_password_strength,
+    verify_password,
+)
 from db import (
     count_leads_by_stage,
     create_workspace,
@@ -40,27 +53,13 @@ load_dotenv()
 
 log = get_logger("forceia.admin")
 
-APP_VERSION = "1.1.0"
-ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
+APP_VERSION = "1.6.1"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 
 app = FastAPI(title="ForceIA Admin", version=APP_VERSION)
 
-
-def require_token(
-    authorization: str | None = Header(default=None),
-    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
-) -> None:
-    if not ADMIN_TOKEN:
-        raise HTTPException(
-            status_code=503,
-            detail="Painel desativado: defina ADMIN_TOKEN no .env",
-        )
-    token = x_admin_token
-    if not token and authorization and authorization.lower().startswith("bearer "):
-        token = authorization[7:]
-    if not token or not secrets.compare_digest(token, ADMIN_TOKEN):
-        raise HTTPException(status_code=401, detail="Token invalido")
+require_token = require_auth
 
 
 class WorkspaceIn(BaseModel):
@@ -72,10 +71,24 @@ class WorkspaceIn(BaseModel):
 
 @app.get("/", include_in_schema=False)
 async def index():
+    spa = WEB_DIST / "index.html"
+    if spa.exists():
+        return FileResponse(spa)
     html = STATIC_DIR / "admin.html"
     if html.exists():
         return FileResponse(html)
-    return JSONResponse({"error": "admin.html nao encontrado"}, status_code=404)
+    return JSONResponse(
+        {"error": "UI nao encontrada. Rode: cd web && npm run build"},
+        status_code=404,
+    )
+
+
+@app.get("/assets/{path:path}", include_in_schema=False)
+async def spa_assets(path: str):
+    target = (WEB_DIST / "assets" / path).resolve()
+    if WEB_DIST.resolve() in target.parents and target.is_file():
+        return FileResponse(target)
+    raise HTTPException(status_code=404, detail="asset nao encontrado")
 
 
 @app.get("/health")
@@ -84,7 +97,35 @@ async def health():
         "status": "ok",
         "service": "forceia-admin",
         "version": APP_VERSION,
-        "enabled": bool(ADMIN_TOKEN),
+        "enabled": auth_enabled(),
+        "auth": "jwt",
+    }
+
+
+@app.post("/api/auth/login", response_model=TokenOut)
+async def api_login(payload: LoginIn):
+    if not auth_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Auth desativada: defina ADMIN_PASSWORD ou ADMIN_TOKEN",
+        )
+    if not verify_password(payload.username, payload.password):
+        raise HTTPException(status_code=401, detail="Credenciais invalidas")
+    token, expires_in = create_access_token(username=payload.username.strip())
+    log.info("login ok", extra={"user": payload.username.strip()})
+    return TokenOut(
+        access_token=token,
+        expires_in=expires_in,
+        username=payload.username.strip(),
+    )
+
+
+@app.get("/api/auth/me")
+async def api_me(claims: dict = Depends(require_token)):
+    return {
+        "username": claims.get("sub"),
+        "role": claims.get("role"),
+        "type": claims.get("type"),
     }
 
 
@@ -205,7 +246,6 @@ async def api_reject(suggestion_id: str, body: ReviewIn | None = None):
 
 @app.post("/api/learning/suggestions/{suggestion_id}/apply", dependencies=[Depends(require_token)])
 async def api_apply(suggestion_id: str):
-    """Aprova (se pending) e ativa override no banco."""
     row = get_prompt_suggestion(suggestion_id)
     if not row:
         raise HTTPException(status_code=404, detail="Sugestao nao encontrada")
@@ -234,7 +274,6 @@ async def api_apply(suggestion_id: str):
 
 @app.post("/api/learning/run/{slug}", dependencies=[Depends(require_token)])
 async def api_run_learning(slug: str, per_outcome: int = 8):
-    """Dispara job de aprendizado para um workspace (sincrono)."""
     from improve_agents import run_learning_for_workspace
     from workspace_context import WorkspaceContext
 
@@ -249,7 +288,14 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.getenv("ADMIN_PORT", "8100"))
-    if not ADMIN_TOKEN:
-        print("AVISO: ADMIN_TOKEN nao definido — as rotas de dados retornarao 503.")
-        print("Defina ADMIN_TOKEN no .env para habilitar o painel.")
+    if not auth_enabled():
+        print("AVISO: auth desativada — defina ADMIN_PASSWORD (JWT) ou ADMIN_TOKEN.")
+    elif not (os.getenv("JWT_SECRET") or "").strip():
+        print("AVISO: JWT_SECRET nao definido — usando segredo de desenvolvimento.")
+    weak = assert_admin_password_policy()
+    if weak:
+        print("ERRO: ADMIN_PASSWORD fraca — login JWT bloqueado ate corrigir:")
+        for err in weak:
+            print(f"  - {err}")
+        print("Ex.: Admin!ForceIA2026x  |  ou FORCEIA_ALLOW_WEAK_PASSWORD=1 so em dev.")
     uvicorn.run(app, host="0.0.0.0", port=port)
