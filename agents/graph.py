@@ -1,7 +1,7 @@
 """
 ForceIA - Grafo de agentes (LangGraph) + traces Langfuse.
 
-prepare → generate (retry) → parse → route → persist
+prepare → generate (retry) → parse → actions → route → persist
 Checkpoints por lead; observabilidade em cada no.
 """
 
@@ -30,6 +30,8 @@ class AgentState(TypedDict, total=False):
     raw_reply: str
     visible_reply: str
     meta: dict
+    action_results: list
+    reply_suffix: str | None
     error: str | None
     retry_count: int
     events: Annotated[list[str], operator.add]
@@ -67,13 +69,15 @@ def build_sales_graph(checkpointer: Any = None):
     else:
         graph.add_node("generate", _node_generate)
     graph.add_node("parse", _node_parse)
+    graph.add_node("actions", _node_actions)
     graph.add_node("route", _node_route)
     graph.add_node("persist", _node_persist)
 
     graph.set_entry_point("prepare")
     graph.add_edge("prepare", "generate")
     graph.add_edge("generate", "parse")
-    graph.add_edge("parse", "route")
+    graph.add_edge("parse", "actions")
+    graph.add_edge("actions", "route")
     graph.add_edge("route", "persist")
     graph.add_edge("persist", END)
 
@@ -205,6 +209,58 @@ def _node_parse(state: AgentState) -> dict:
     }
 
 
+def _node_actions(state: AgentState) -> dict:
+    """Calendar / e-mail / Slack a partir do META."""
+    from integrations.actions import run_agent_actions
+
+    meta = state.get("meta") or {}
+    lead = state.get("lead") or {}
+    agent = state.get("agent") or "sdr"
+    stage = state.get("stage") or "sdr"
+    reply = state.get("visible_reply") or ""
+
+    out = run_agent_actions(
+        workspace_id=state["workspace_id"],
+        agent=agent,
+        stage=stage,
+        meta=meta,
+        lead=lead,
+        visible_reply=reply,
+    )
+    suffix = out.get("reply_suffix")
+    new_reply = reply
+    if suffix:
+        new_reply = (reply.rstrip() + "\n\n" + suffix).strip()
+
+    lead_meta = dict(lead.get("metadata") or {})
+    lead_meta.update(out.get("lead_metadata") or {})
+    lead = {**lead, "metadata": lead_meta}
+
+    events = [f"action:{a.get('type')}" for a in (out.get("actions") or [])]
+    trace = state.get("_trace")
+    if trace is not None:
+        try:
+            with trace.span("actions", count=len(out.get("actions") or [])):
+                for a in out.get("actions") or []:
+                    r = a.get("result") or {}
+                    trace.event(
+                        "integration_action",
+                        type=a.get("type"),
+                        success=bool(r.get("success")),
+                        error=r.get("error"),
+                    )
+        except Exception:
+            pass
+
+    return {
+        "visible_reply": new_reply,
+        "lead": lead,
+        "action_results": out.get("actions") or [],
+        "reply_suffix": suffix,
+        "events": events,
+    }
+
+
 def _node_route(state: AgentState) -> dict:
     current = state.get("stage") or "sdr"
     target = state.get("new_stage") or current
@@ -311,6 +367,10 @@ def invoke_turn(
     message_id: str | None = None,
 ) -> str:
     from observability import start_turn_trace, flush as lf_flush
+    from db import (
+        add_message, get_lead_by_phone, is_agent_paused, log_event,
+        mark_message_processed, upsert_lead,
+    )
 
     trace = start_turn_trace(
         workspace_id=workspace_id,
@@ -320,6 +380,26 @@ def invoke_turn(
         session_id=thread_id_for(workspace_id, phone),
         tags=["langgraph"],
     )
+
+    lead0 = get_lead_by_phone(workspace_id, phone)
+    if lead0 and is_agent_paused(lead0):
+        add_message(lead0["id"], "user", text)
+        if message_id:
+            mark_message_processed(workspace_id, message_id, lead_id=lead0["id"])
+        log_event(
+            "agent_skipped_paused",
+            {"phone": phone, "text": (text or "")[:200]},
+            lead_id=lead0["id"],
+            workspace_id=workspace_id,
+        )
+        upsert_lead(workspace_id, phone)
+        try:
+            trace.end(output={"reply": "", "paused": True})
+        except Exception:
+            pass
+        lf_flush()
+        return ""
+
     app = get_compiled_graph()
     config = {"configurable": {"thread_id": thread_id_for(workspace_id, phone)}}
     initial: AgentState = {
