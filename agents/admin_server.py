@@ -31,6 +31,8 @@ from auth import (
 from db import (
     count_leads_by_stage,
     create_workspace,
+    get_lead_by_id,
+    get_messages_for_lead,
     get_prompt_suggestion,
     get_workspace_by_slug,
     list_active_workspaces,
@@ -53,7 +55,7 @@ load_dotenv()
 
 log = get_logger("forceia.admin")
 
-APP_VERSION = "1.6.1"
+APP_VERSION = "1.7.0"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 
@@ -191,6 +193,49 @@ async def api_leads(slug: str, limit: int = 100):
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace nao encontrado")
     return list_leads(ws["id"], limit=limit)
+
+
+@app.get("/api/workspaces/{slug}/leads/{lead_id}", dependencies=[Depends(require_token)])
+async def api_lead_detail(slug: str, lead_id: str, messages_limit: int = 100):
+    """Detalhe do lead + transcript (mensagens ordenadas)."""
+    ws = get_workspace_by_slug(slug)
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workspace nao encontrado")
+    lead = get_lead_by_id(ws["id"], lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead nao encontrado")
+    limit = max(1, min(int(messages_limit or 100), 500))
+    messages = get_messages_for_lead(lead_id, limit=limit)
+    transcript = []
+    for m in messages:
+        content = m.get("content") or ""
+        if "---META---" in content:
+            content = content.split("---META---", 1)[0].rstrip()
+        transcript.append(
+            {
+                "role": m.get("role"),
+                "content": content,
+                "agent": m.get("agent"),
+                "created_at": m.get("created_at"),
+            }
+        )
+    return {
+        "lead": {
+            "id": lead.get("id"),
+            "phone": lead.get("phone"),
+            "name": lead.get("name"),
+            "company": lead.get("company"),
+            "email": lead.get("email"),
+            "stage": lead.get("stage"),
+            "bant": lead.get("bant") or {},
+            "metadata": lead.get("metadata") or {},
+            "last_message_at": lead.get("last_message_at"),
+            "updated_at": lead.get("updated_at"),
+            "created_at": lead.get("created_at"),
+        },
+        "messages": transcript,
+        "message_count": len(transcript),
+    }
 
 
 @app.get("/api/workspaces/{slug}/events", dependencies=[Depends(require_token)])
