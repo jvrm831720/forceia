@@ -24,6 +24,16 @@ type Lead = {
 };
 type EventRow = { type?: string; created_at?: string };
 type Suggestion = { id: string; agent?: string; title?: string; rationale?: string };
+type LeadDetail = {
+  lead: Lead & {
+    email?: string;
+    bant?: Record<string, string>;
+    metadata?: Record<string, unknown>;
+    created_at?: string;
+  };
+  messages: { role?: string; content?: string; agent?: string; created_at?: string }[];
+  message_count: number;
+};
 
 function getToken() {
   return localStorage.getItem(TOKEN_KEY) || "";
@@ -85,6 +95,10 @@ export default function App() {
   const [wsKey, setWsKey] = useState<string | null>(null);
   const [wsErr, setWsErr] = useState("");
   const [learnBusy, setLearnBusy] = useState(false);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [leadDetail, setLeadDetail] = useState<LeadDetail | null>(null);
+  const [leadDetailLoading, setLeadDetailLoading] = useState(false);
+  const [leadDetailErr, setLeadDetailErr] = useState("");
 
   const loadWorkspaces = useCallback(async () => {
     const wss = await api<Workspace[]>("/api/workspaces");
@@ -95,6 +109,9 @@ export default function App() {
 
   const selectWorkspace = useCallback(async (slug: string) => {
     setCurrent(slug);
+    setSelectedLeadId(null);
+    setLeadDetail(null);
+    setLeadDetailErr("");
     setSub("carregando…");
     try {
       const [m, l, ev] = await Promise.all([
@@ -119,6 +136,27 @@ export default function App() {
       setSuggestions([]);
     }
   }, []);
+
+  const loadLeadDetail = useCallback(
+    async (leadId: string) => {
+      if (!current) return;
+      setLeadDetailLoading(true);
+      setLeadDetailErr("");
+      try {
+        const data = await api<LeadDetail>(
+          `/api/workspaces/${current}/leads/${leadId}?messages_limit=150`,
+        );
+        setLeadDetail(data);
+        setSelectedLeadId(leadId);
+      } catch {
+        setLeadDetail(null);
+        setLeadDetailErr("Não foi possível carregar o lead.");
+      } finally {
+        setLeadDetailLoading(false);
+      }
+    },
+    [current],
+  );
 
   useEffect(() => {
     if (!authed) return;
@@ -374,43 +412,126 @@ export default function App() {
           )}
 
           {tab === "leads" && (
-            <div className="card full">
-              <h2>Leads recentes</h2>
-              {!leads.length ? (
-                <div className="empty">Sem leads</div>
-              ) : (
-                <table className="lead-tbl">
-                  <thead>
-                    <tr>
-                      <th>Telefone</th>
-                      <th>Nome</th>
-                      <th>Empresa</th>
-                      <th>Estágio</th>
-                      <th>Última msg</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leads.map((l) => (
-                      <tr key={l.id || l.phone}>
-                        <td className="phone">{l.phone || ""}</td>
-                        <td>{l.name || "—"}</td>
-                        <td>{l.company || "—"}</td>
-                        <td>
-                          <span
-                            className="tag"
-                            style={{ color: STAGE_COLORS[l.stage || ""] || "var(--muted)" }}
-                          >
-                            {l.stage || ""}
-                          </span>
-                        </td>
-                        <td className="phone" style={{ color: "var(--muted)" }}>
-                          {fmtDate(l.last_message_at || l.updated_at)}
-                        </td>
+            <div className="lead-layout">
+              <div className="card full">
+                <h2>Leads recentes</h2>
+                {!leads.length ? (
+                  <div className="empty">Sem leads</div>
+                ) : (
+                  <table className="lead-tbl">
+                    <thead>
+                      <tr>
+                        <th>Telefone</th>
+                        <th>Nome</th>
+                        <th>Empresa</th>
+                        <th>Estágio</th>
+                        <th>Última msg</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                    </thead>
+                    <tbody>
+                      {leads.map((l) => (
+                        <tr
+                          key={l.id || l.phone}
+                          className={
+                            "clickable" + (l.id && l.id === selectedLeadId ? " selected" : "")
+                          }
+                          onClick={() => l.id && loadLeadDetail(l.id)}
+                        >
+                          <td className="phone">{l.phone || ""}</td>
+                          <td>{l.name || "—"}</td>
+                          <td>{l.company || "—"}</td>
+                          <td>
+                            <span
+                              className="tag"
+                              style={{ color: STAGE_COLORS[l.stage || ""] || "var(--muted)" }}
+                            >
+                              {l.stage || ""}
+                            </span>
+                          </td>
+                          <td className="phone" style={{ color: "var(--muted)" }}>
+                            {fmtDate(l.last_message_at || l.updated_at)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              <div className="card full">
+                <div className="lead-detail-head">
+                  <div>
+                    <h3>
+                      {leadDetail?.lead?.name ||
+                        leadDetail?.lead?.phone ||
+                        (selectedLeadId ? "Lead" : "Selecione um lead")}
+                    </h3>
+                    <div className="sub" style={{ marginTop: 4 }}>
+                      {leadDetail
+                        ? `${leadDetail.message_count} msgs · ${leadDetail.lead.stage || ""}`
+                        : "Clique em uma linha para ver o transcript"}
+                    </div>
+                  </div>
+                  {selectedLeadId && (
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => {
+                        setSelectedLeadId(null);
+                        setLeadDetail(null);
+                      }}
+                    >
+                      Fechar
+                    </button>
+                  )}
+                </div>
+
+                {leadDetailLoading && <div className="empty">Carregando transcript…</div>}
+                {leadDetailErr && <div className="err">{leadDetailErr}</div>}
+
+                {leadDetail && !leadDetailLoading && (
+                  <>
+                    <div className="bant-grid">
+                      {(["need", "authority", "budget", "timeline"] as const).map((k) => (
+                        <div className="bant-item" key={k}>
+                          <div className="k">{k}</div>
+                          <div className="v">
+                            {(leadDetail.lead.bant && leadDetail.lead.bant[k]) || "—"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="meta-kv">
+                      {leadDetail.lead.company
+                        ? `Empresa: ${leadDetail.lead.company} · `
+                        : ""}
+                      {leadDetail.lead.email ? `Email: ${leadDetail.lead.email} · ` : ""}
+                      Tel: {leadDetail.lead.phone || "—"}
+                    </div>
+                    <h2 style={{ marginTop: 16 }}>Transcript</h2>
+                    {!leadDetail.messages.length ? (
+                      <div className="empty">Sem mensagens ainda</div>
+                    ) : (
+                      <div className="chat-scroll">
+                        {leadDetail.messages.map((m, i) => {
+                          const role = (m.role || "assistant").toLowerCase();
+                          const isUser = role === "user" || role === "human" || role === "lead";
+                          return (
+                            <div
+                              key={`${m.created_at}-${i}`}
+                              className={"chat-row " + (isUser ? "user" : "assistant")}
+                            >
+                              <div className="chat-bubble">{m.content || ""}</div>
+                              <div className="chat-meta">
+                                {isUser ? "lead" : m.agent || role} · {fmtDate(m.created_at)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
 
