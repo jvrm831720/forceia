@@ -123,3 +123,11 @@ def mount_integration_routes(app, require_token):
         mount_playbook_routes(app, require_token)
     except Exception:
         pass
+
+    # Inteligência de elite (Prioridade 2)
+    try:
+        from elite_routes import mount_elite_routes
+
+        mount_elite_routes(app, require_admin=require_token)
+    except Exception:
+        pass
