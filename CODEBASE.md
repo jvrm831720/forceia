@@ -1,9 +1,8 @@
 # ForceIA — Codebase Map
 
-> **Mapa vivo do repositório.** Atualize este arquivo a cada marco relevante.
-> Última revisão: **2026-08-04** · Versão produto: **2.1.0 (P3)**
+> **Mapa vivo do repositório.** Última revisão: **2026-08-04** · Versão: **2.2.0 (P4)**
 
-Objetivo: cada empresa sente que tem o **melhor SDR**, **melhor Closer** e **melhor Follow-up** por lead.
+Objetivo: cada empresa sente que tem o **melhor SDR**, **melhor Closer** e **melhor Follow-up** por lead — com **confiança** (não inventa preço/prazo).
 
 ---
 
@@ -12,79 +11,75 @@ Objetivo: cada empresa sente que tem o **melhor SDR**, **melhor Closer** e **mel
 | Item | Valor |
 |------|--------|
 | Repo | https://github.com/jvrm831720/forceia |
-| Agentes | SDR → Closer → Follow-up (LangGraph + OpenAI) |
-| Canal | Evolution API (WhatsApp) |
+| Agentes | SDR → Closer → Follow-up |
+| Canal | Evolution API |
 | Dados | Supabase multi-tenant |
-| CRM | Twenty (opcional) |
-| Integrações | Composio |
-| Painel | FastAPI `:8100` + React `web/` |
+| Painel | FastAPI + React |
 
 ---
 
-## 2. Árvore (destaques P1–P3)
+## 2. Árvore (P1–P4)
 
 ```
 agents/
-  playbook.py, playbook_routes.py          # P1
-  lead_score.py, intent.py, enrichment.py,
-  closer_tools.py, elite_routes.py         # P2
-  performance.py                           # P3 KPIs + headline
-  owner_reports.py                         # P3 relatório WhatsApp dono
-  playground.py                            # P3 simulação
-  product_routes.py                        # P3 API
-  integrations/admin_routes.py             # mount P1+P2+P3
-web/src/
-  App.tsx                  # Time · Performance · Playground · Leads…
-  PerformancePanel.tsx
-  PlaygroundPanel.tsx
-  PlaybookPanel.tsx
-  product.css
+  playbook.py                         # P1
+  lead_score, intent, enrichment,
+  closer_tools, elite_routes          # P2
+  performance, owner_reports,
+  playground, product_routes          # P3
+  guardrails.py                       # P4 — preço/prazo
+  ab_testing.py                       # P4 — A/B conversão
+  handoff.py                          # P4 — resumo + notify
+  trust_routes.py                     # P4 API
+  intelligence.py                     # + guardrails no prompt
+  run_sdr.py                          # + guardrails, A/B, handoff
 docs/
-  PLAYBOOK.md · ELITE.md · PRODUCT.md
+  PLAYBOOK · ELITE · PRODUCT · TRUST.md
 ```
 
 ---
 
 ## 3. Linha do tempo
 
-### Fundação → 1.9
-MVP, multi-tenant, WhatsApp, BANT, stages, admin JWT, notes/timeline/pause, Composio.
+| Prioridade | Status |
+|------------|--------|
+| P1 Playbook | ✅ |
+| P2 Elite (API; wire graph ⏳) | ✅ módulos |
+| P3 Product UX | ✅ |
+| **P4 Confiabilidade** | ✅ |
 
-### P1 — Playbook (2.0)
-ICP/pricing/cases/tom por workspace no system prompt + aba Playbook.
+### P4 — detalhes
 
-### P2 — Elite
-API: enrichment, score/hot-leads, intent, calendar/proposal. Wire LangGraph ⏳.
+| # | Feature | Módulo |
+|---|---------|--------|
+| 13 | Guardrails (não inventar preço/prazo) | `guardrails.py` |
+| 14 | A/B prompts + conversão | `ab_testing.py` |
+| 15 | Handoff suave (resumo + WhatsApp) | `handoff.py` |
 
-### **P3 — Experiência de produto ✅**
-
-| # | Feature | Onde |
-|---|---------|------|
-| 9 | Dashboard “SDR agendou X reuniões” + IA vs humano | `performance.py` + aba Performance |
-| 10 | Relatório WhatsApp para o dono | `owner_reports.py` |
-| 11 | Playground lead fictício | `playground.py` + aba Playground |
-| 12 | UI premium (painel de time) | App copy + `product.css` |
-
-**APIs P3**
-- `GET /api/workspaces/{slug}/performance?period=week|day|month`
-- `GET /api/workspaces/{slug}/reports/preview`
-- `POST /api/workspaces/{slug}/reports/send`
-- `PUT /api/workspaces/{slug}/owner-phone`
-- `POST /api/workspaces/{slug}/playground`
+**APIs P4**
+- `GET  /api/workspaces/{slug}/ab-report`
+- `POST /api/workspaces/{slug}/leads/{id}/handoff`
+- `POST /api/workspaces/{slug}/guardrails/scan`
 
 ---
 
-## 4. Dados
+## 4. Runtime (legado)
 
-Sem migration nova na P3. Usa `events` + `metadata.owner_phone`. Playground não grava leads.
+```
+lead → assign A/B → prompt variante → LLM
+     → split META → enforce_guardrails
+     → se handoff: pause + notify humano
+     → persist + WhatsApp
+```
 
 ---
 
-## 5. Roadmap
+## 5. Roadmap aberto
 
-**Feito:** MVP, pause, Composio, Playbook, Elite API, Product UX (P3).
-
-**Aberto:** wire LangGraph P2 · hot-leads UI · cron relatório dono · billing · E2E.
+- Wire LangGraph P2 no fluxo WhatsApp
+- UI hot-leads / A/B no painel
+- Cron relatório dono
+- Billing · E2E
 
 ---
 
