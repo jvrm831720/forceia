@@ -2,7 +2,7 @@
 ForceIA - Camada de inteligencia dos agentes.
 
 - Extrai BANT, nome, empresa, email e intencao a partir da conversa
-- Monta contexto rico para o system prompt (lead + playbook + guardrails)
+- Monta contexto rico para o system prompt (lead + playbook + guardrails + skills)
 - Parseia bloco ---META--- (JSON) retornado pelo LLM
 - Calcula score de qualificacao
 """
@@ -221,6 +221,9 @@ def build_system_prompt(
     lead: dict,
     workspace_name: str,
     playbook: dict | None = None,
+    *,
+    agent: str | None = None,
+    messages: list[dict] | None = None,
 ) -> str:
     from guardrails import format_guardrails_for_prompt
     from playbook import format_playbook_for_prompt
@@ -228,6 +231,33 @@ def build_system_prompt(
     context = build_lead_context(lead, workspace_name=workspace_name)
     playbook_block = format_playbook_for_prompt(playbook)
     guardrails_block = format_guardrails_for_prompt(playbook)
+
+    # Skills de elite (ICP, personalização, pré-call, revival, pipeline)
+    skills_block = ""
+    try:
+        from skills import build_skills_context
+        from state_machine import next_agent_for_stage
+
+        stage = (lead.get("stage") or "sdr").lower()
+        agent_name = (agent or next_agent_for_stage(stage) or "sdr").lower()
+        skills_block = build_skills_context(
+            lead=lead,
+            playbook=playbook,
+            agent=agent_name,
+            messages=messages,
+        )
+    except Exception:
+        skills_block = ""
+
+    # Enrichment legado (se existir)
+    enrichment_block = ""
+    try:
+        from enrichment import format_enrichment_for_prompt
+
+        enrichment_block = format_enrichment_for_prompt(lead)
+    except Exception:
+        pass
+
     protocol = """
 ## Protocolo interno (obrigatorio)
 
@@ -249,6 +279,10 @@ Regras do META:
     if playbook_block:
         parts.append(playbook_block)
     parts.append(guardrails_block)
+    if enrichment_block:
+        parts.append(enrichment_block)
+    if skills_block:
+        parts.append(skills_block)
     parts.append(f"## Contexto deste lead\n{context}")
     parts.append(protocol)
     return "\n\n".join(parts)
