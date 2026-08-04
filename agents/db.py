@@ -68,6 +68,27 @@ def list_active_workspaces() -> list[dict]:
     return result.data or []
 
 
+def update_workspace_metadata(workspace_id: str, extra: dict) -> dict:
+    """Merge keys into workspaces.metadata (None removes key)."""
+    row = get_workspace_by_id(workspace_id)
+    if not row:
+        raise RuntimeError(f"workspace não encontrado: {workspace_id}")
+    meta = dict(row.get("metadata") or {})
+    for k, v in extra.items():
+        if v is None:
+            meta.pop(k, None)
+        else:
+            meta[k] = v
+    result = (
+        get_client()
+        .table("workspaces")
+        .update({"metadata": meta})
+        .eq("id", workspace_id)
+        .execute()
+    )
+    return (result.data[0].get("metadata") if result.data else meta) or meta
+
+
 def create_workspace(name: str, slug: str, **fields: Any) -> dict:
     payload = {"name": name, "slug": slug, **{k: v for k, v in fields.items() if v is not None}}
     result = get_client().table("workspaces").insert(payload).execute()
