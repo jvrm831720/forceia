@@ -10,6 +10,7 @@ uvicorn[standard]>=0.29.0
 # Config / validacao
 python-dotenv>=1.0.0
 pydantic>=2.6.0
+PyJWT>=2.8.0
 
 # Banco (multi-tenant)
 supabase>=2.4.0
@@ -18,5 +19,5 @@ supabase>=2.4.0
 langgraph>=0.2.0
 langchain-core>=0.2.0
 
-# Observabilidade (traces LLM / decisoes)
+# Observabilidade
 langfuse>=2.0.0

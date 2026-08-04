@@ -2,6 +2,24 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.6.1]
+
+### Adicionado
+- **Política de senha forte** (`validate_password_strength`):
+  min 12 chars, maiúscula, minúscula, dígito, símbolo; bloqueia placeholders
+  - `ADMIN_PASSWORD` fraca → login JWT recusado + aviso no boot
+  - `FORCEIA_ALLOW_WEAK_PASSWORD=1` só para dev
+
+## [1.6.0]
+
+### Adicionado
+- **Auth JWT** no painel admin (`agents/auth.py`):
+  - `POST /api/auth/login` → access_token (HS256)
+  - `GET /api/auth/me` claims do operador
+  - `ADMIN_USER` / `ADMIN_PASSWORD` / `JWT_SECRET` / `JWT_EXPIRE_MINUTES`
+  - Compatível com `ADMIN_TOKEN` legado
+- Testes `tests/test_auth.py`
+
 ## [1.5.0]
 
 ### Adicionado
