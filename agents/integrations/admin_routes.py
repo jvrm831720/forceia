@@ -115,3 +115,11 @@ def mount_integration_routes(app, require_token):
             "sdk_installed": sdk_ok,
             "toolkits": [t.slug for t in list_available_toolkits()],
         }
+
+    # Playbook por workspace (Prioridade 1)
+    try:
+        from playbook_routes import mount_playbook_routes
+
+        mount_playbook_routes(app, require_token)
+    except Exception:
+        pass
