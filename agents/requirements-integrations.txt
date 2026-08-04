@@ -1,0 +1,2 @@
+# Dependências opcionais de integrações ForceIA
+composio>=0.7.0
