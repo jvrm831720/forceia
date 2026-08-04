@@ -10,24 +10,28 @@
 
 Repo: https://github.com/jvrm831720/forceia
 
+**Mapa completo do código (desde o dia 01):** [CODEBASE.md](CODEBASE.md)
+
 ---
 
 ## O que é
 
 Agentes de IA (SDR, Closer e Follow-up) atendem leads no WhatsApp, qualificam com
 BANT, avançam o funil por uma máquina de estados e sincronizam com o CRM Twenty.
-Cada cliente é um **workspace** isolado no Supabase.
+Cada cliente é um **workspace** isolado no Supabase, com **playbook** próprio
+(ICP, pricing, cases, tom) para os agentes se comportarem como especialistas do vertical.
 
 ## Stack
 
 | Camada | Tecnologia |
 |--------|------------|
 | WhatsApp | Evolution API |
-| Agentes | Python + OpenAI |
+| Agentes | Python + OpenAI + LangGraph |
 | Banco | Supabase (multi-tenant) |
 | CRM | Twenty (opcional, por workspace) |
+| Integrações | Composio (Calendar, LinkedIn…) |
 | Jobs | Follow-up + sync Twenty |
-| Painel | FastAPI + dashboard HTML |
+| Painel | FastAPI admin + console React |
 
 ## Quickstart
 
@@ -63,7 +67,7 @@ make admin         # painel admin em :8100
 make admin         # http://localhost:8100
 ```
 
-KPIs, funil de pipeline, leads, eventos e criação de workspace. Veja [docs/ADMIN.md](docs/ADMIN.md).
+KPIs, funil de pipeline, leads, eventos, playbook e criação de workspace. Veja [docs/ADMIN.md](docs/ADMIN.md).
 
 ## Deploy 24/7
 
@@ -89,7 +93,7 @@ python sync_twenty_job.py --workspace default
 
 ```bash
 ruff check agents   # lint
-pytest              # 19 testes, sem serviços externos
+pytest              # testes unitários, sem serviços externos
 ```
 
 CI roda `ruff` + `pytest` em Python 3.11 e 3.12 a cada push/PR.
@@ -97,20 +101,30 @@ CI roda `ruff` + `pytest` em Python 3.11 e 3.12 a cada push/PR.
 ## Estrutura
 
 ```
+CODEBASE.md        mapa vivo do repositório (comece por aqui)
 agents/            agentes, webhook, painel admin, jobs e testes
-  static/          dashboard do painel admin
-  tests/           testes unitários (pytest)
+  playbook.py      especialização por workspace (P1)
+  lead_score.py    score + hot leads (P2)
+  intent.py        ready_to_buy vs researching (P2)
+  enrichment.py    enrich pré-mensagem (P2)
+  closer_tools.py  Calendar + proposta (P2)
+  integrations/    Composio
+  tests/           pytest
+web/               console React (leads, playbook, notes, pause)
 config/prompts/    prompts editáveis (sdr / closer / followup)
-supabase/          schema.sql + migração multi-tenant
+supabase/          schema + migrations
 docker/            init do Postgres da Evolution
-docs/              documentação
+docs/              documentação temática
 ```
 
 ## Documentação
 
+**[CODEBASE.md](CODEBASE.md)** (mapa completo) ·
 [Setup](docs/SETUP.md) · [Deploy](docs/DEPLOY.md) · [Admin](docs/ADMIN.md) ·
 [Multi-tenant](docs/MULTI_TENANT.md) · [Supabase](docs/SUPABASE.md) ·
-[Twenty](docs/TWENTY.md) · [Integrações](docs/INTEGRATIONS.md) · [Follow-up](docs/FOLLOWUP.md) · [Playbook](docs/PLAYBOOK.md) · [Arquitetura](docs/ARCHITECTURE.md)
+[Twenty](docs/TWENTY.md) · [Integrações](docs/INTEGRATIONS.md) ·
+[Follow-up](docs/FOLLOWUP.md) · [Playbook](docs/PLAYBOOK.md) ·
+[Elite](docs/ELITE.md) · [Arquitetura](docs/ARCHITECTURE.md)
 
 ## Roadmap
 
@@ -120,9 +134,11 @@ docs/              documentação
 - [x] Logging estruturado (JSON)
 - [x] Testes + CI
 - [x] Dockerfile + deploy documentado
-- [x] Camada de integrações Fase 0+1 (Composio session/authorize/API) — ver docs/INTEGRATIONS.md
+- [x] Camada de integrações Fase 0+1 (Composio session/authorize/API)
 - [x] Playbook por workspace (ICP, pricing, cases, tom → system prompt)
-- [ ] Agendamento real (Calendar tool no Closer) e triggers
+- [x] Módulos elite: score, intent, enrichment, closer tools + API
+- [ ] Wire LangGraph (enrich/intent/score/calendar automáticos no fluxo WhatsApp)
+- [ ] UI hot-leads + badges de score/intent
 - [ ] Billing por plano (Asaas/Stripe)
 - [ ] Testes E2E com mensagem real
 
