@@ -1,4 +1,6 @@
 import PlaybookPanel from "./PlaybookPanel";
+import PerformancePanel from "./PerformancePanel";
+import PlaygroundPanel from "./PlaygroundPanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const STAGE_COLORS: Record<string, string> = {
@@ -50,6 +52,11 @@ type LeadDetail = {
   messages: { role?: string; content?: string; agent?: string; created_at?: string }[];
   message_count: number;
   events?: LeadEvent[];
+};
+type Performance = {
+  headline?: string;
+  meetings?: { total?: number; ai?: number; human?: number };
+  qualified?: { ai?: number; human?: number };
 };
 
 function getToken() {
@@ -110,7 +117,14 @@ function waLink(phone?: string) {
   return `https://wa.me/${digits}`;
 }
 
-type Tab = "overview" | "leads" | "events" | "playbook" | "learning";
+type Tab =
+  | "overview"
+  | "performance"
+  | "leads"
+  | "playground"
+  | "events"
+  | "playbook"
+  | "learning";
 
 export default function App() {
   const [authed, setAuthed] = useState(!!getToken());
@@ -122,9 +136,10 @@ export default function App() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [perf, setPerf] = useState<Performance | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [tab, setTab] = useState<Tab>("overview");
-  const [sub, setSub] = useState("Time de agentes · SDR · Closer · Follow-up");
+  const [sub, setSub] = useState("Painel do time de vendas · SDR · Closer · Follow-up");
   const [wsOpen, setWsOpen] = useState(false);
   const [wsName, setWsName] = useState("");
   const [wsSlug, setWsSlug] = useState("");
@@ -139,7 +154,6 @@ export default function App() {
   const [stageBusy, setStageBusy] = useState(false);
   const [pauseBusy, setPauseBusy] = useState(false);
   const [noteText, setNoteText] = useState("");
-  const [noteBusy, setNoteBusy] = useState(false);
   const [leadFilter, setLeadFilter] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -161,15 +175,20 @@ export default function App() {
     setStageFilter("all");
     setSub("carregando…");
     try {
-      const [m, l, ev] = await Promise.all([
+      const [m, l, ev, p] = await Promise.all([
         api<Metrics>(`/api/workspaces/${slug}/metrics`),
         api<Lead[]>(`/api/workspaces/${slug}/leads?limit=80`),
         api<EventRow[]>(`/api/workspaces/${slug}/events?limit=40`),
+        api<Performance>(`/api/workspaces/${slug}/performance?period=week`).catch(() => null),
       ]);
       setMetrics(m);
       setLeads(l);
       setEvents(ev);
-      setSub(`${m.total} leads · atualizado agora`);
+      setPerf(p);
+      setSub(
+        p?.headline ||
+          `${m.total} leads · time de vendas ativo`,
+      );
     } catch {
       setSub("erro ao carregar");
     }
@@ -239,7 +258,7 @@ export default function App() {
         method: "POST",
         body: JSON.stringify({
           paused: next,
-          reason: next ? "humano assumiu no console" : "agente retomado",
+          reason: next ? "humano assumiu no painel" : "agente retomado",
         }),
       });
       await loadLeadDetail(selectedLeadId);
@@ -308,8 +327,8 @@ export default function App() {
     return (
       <div className="overlay">
         <div className="modal">
-          <h3>Acesso ao console</h3>
-          <p>Entre com o usuário admin (JWT).</p>
+          <h3>ForceIA · Time de vendas</h3>
+          <p>Acesse o painel do seu SDR, Closer e Follow-up de IA.</p>
           <div className="field">
             <label>Usuário</label>
             <input
@@ -333,7 +352,7 @@ export default function App() {
             />
           </div>
           <button className="btn btn-primary" style={{ width: "100%" }} onClick={() => void doLogin()}>
-            Entrar
+            Entrar no painel
           </button>
           <div className="err">{gateErr}</div>
         </div>
@@ -346,6 +365,7 @@ export default function App() {
     (metrics?.by_stage?.qualified || 0) + (metrics?.by_stage?.closer || 0);
   const detailLead = leadDetail?.lead;
   const wa = waLink(detailLead?.phone);
+  const wsNameCurrent = workspaces.find((w) => w.slug === current)?.name || current;
 
   return (
     <div className="shell">
@@ -360,14 +380,14 @@ export default function App() {
             </div>
           </div>
           <div className="status">
-            <span className="pulse" /> Console online
+            <span className="pulse" /> Time de vendas online
           </div>
           <div>
-            <div className="label">Workspaces</div>
+            <div className="label">Empresas</div>
             <div className="ws-list">
               {!workspaces.length ? (
                 <div className="empty" style={{ textAlign: "left", padding: "8px 0" }}>
-                  Nenhum ainda
+                  Nenhuma ainda
                 </div>
               ) : (
                 workspaces.map((w) => (
@@ -393,7 +413,7 @@ export default function App() {
                 setWsErr("");
               }}
             >
-              + Novo workspace
+              + Nova empresa
             </button>
             <button
               className="btn btn-ghost"
@@ -410,7 +430,7 @@ export default function App() {
         <section className="main">
           <div className="top fade-in">
             <div>
-              <h1>{current || "Selecione um workspace"}</h1>
+              <h1>{wsNameCurrent || "Selecione uma empresa"}</h1>
               <div className="sub">{sub}</div>
             </div>
             <div className="top-actions">
@@ -434,7 +454,7 @@ export default function App() {
                   }
                 }}
               >
-                {learnBusy ? "Rodando…" : "Rodar learning"}
+                {learnBusy ? "Rodando…" : "Melhorar agentes"}
               </button>
             </div>
           </div>
@@ -442,8 +462,10 @@ export default function App() {
           <div className="tabs">
             {(
               [
-                ["overview", "Overview"],
+                ["overview", "Time"],
+                ["performance", "Performance"],
                 ["leads", "Leads"],
+                ["playground", "Playground"],
                 ["events", "Eventos"],
                 ["playbook", "Playbook"],
                 ["learning", "Learning"],
@@ -462,9 +484,26 @@ export default function App() {
 
           {tab === "overview" && (
             <div className="bento">
+              {perf?.headline && (
+                <div className="card full headline-card">
+                  <div className="headline-banner">{perf.headline}</div>
+                  <div className="perf-mini-row">
+                    <span>
+                      Reuniões IA <b>{perf.meetings?.ai ?? 0}</b>
+                    </span>
+                    <span>
+                      Humano <b>{perf.meetings?.human ?? 0}</b>
+                    </span>
+                    <span>
+                      Qualificados IA <b>{perf.qualified?.ai ?? 0}</b>
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="card kpi">
-                <h2>Leads totais</h2>
+                <h2>Leads no funil</h2>
                 <div className="val">{metrics?.total ?? "—"}</div>
+                <div className="hint">Seu time de IA atende 24/7</div>
               </div>
               <div className="card kpi">
                 <h2>Win rate</h2>
@@ -476,6 +515,7 @@ export default function App() {
               <div className="card kpi">
                 <h2>Em pipeline</h2>
                 <div className="val">{metrics ? activePipe : "—"}</div>
+                <div className="hint">qualified + closer</div>
               </div>
               <div className="card funnel-card">
                 <h2>Funil por estágio</h2>
@@ -503,11 +543,15 @@ export default function App() {
                 )}
               </div>
               <div className="card events-card">
-                <h2>Eventos recentes</h2>
+                <h2>Atividade recente</h2>
                 <EventList events={events} />
               </div>
             </div>
           )}
+
+          {tab === "performance" && <PerformancePanel workspace={current} />}
+
+          {tab === "playground" && <PlaygroundPanel workspace={current} />}
 
           {tab === "leads" && (
             <div className="lead-layout">
@@ -562,6 +606,11 @@ export default function App() {
                             <span className="tag" style={{ color: STAGE_COLORS[l.stage || ""] || "var(--muted)" }}>
                               {l.stage || ""}
                             </span>
+                            {(l.metadata?.agent_paused || l.metadata?.human_takeover) && (
+                              <span className="tag" style={{ marginLeft: 6, color: "var(--signal)" }}>
+                                humano
+                              </span>
+                            )}
                           </td>
                           <td className="phone" style={{ color: "var(--muted)" }}>
                             {fmtDate(l.last_message_at || l.updated_at)}
@@ -726,7 +775,7 @@ export default function App() {
       {wsOpen && (
         <div className="overlay">
           <div className="modal">
-            <h3>Novo workspace</h3>
+            <h3>Nova empresa</h3>
             <div className="field">
               <label>Nome</label>
               <input value={wsName} onChange={(e) => setWsName(e.target.value)} placeholder="Clínica Sol" />
@@ -734,6 +783,10 @@ export default function App() {
             <div className="field">
               <label>Slug</label>
               <input value={wsSlug} onChange={(e) => setWsSlug(e.target.value)} placeholder="clinica-sol" />
+            </div>
+            <div className="field">
+              <label>Instance Evolution (opcional)</label>
+              <input value={wsInst} onChange={(e) => setWsInst(e.target.value)} placeholder="clinica-sol" />
             </div>
             {wsKey && <div className="keybox">{wsKey}</div>}
             <div className="err">{wsErr}</div>
@@ -757,7 +810,7 @@ export default function App() {
                     });
                     setWsKey(r.api_key);
                     await loadWorkspaces();
-                  } catch (e) {
+                  } catch {
                     setWsErr("Erro ao criar workspace.");
                   }
                 }}
