@@ -150,3 +150,10 @@ def mount_integration_routes(app, require_token):
         mount_skills_routes(app, require_admin=require_token)
     except Exception:
         pass
+
+    try:
+        from scraper_routes import mount_scraper_routes
+
+        mount_scraper_routes(app, require_admin=require_token)
+    except Exception:
+        pass
