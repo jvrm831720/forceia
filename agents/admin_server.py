@@ -61,13 +61,17 @@ load_dotenv()
 
 log = get_logger("forceia.admin")
 
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.9.0"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 
 app = FastAPI(title="ForceIA Admin", version=APP_VERSION)
 
 require_token = require_auth
+
+from integrations.admin_routes import mount_integration_routes
+
+mount_integration_routes(app, require_token)
 
 
 class WorkspaceIn(BaseModel):
@@ -366,7 +370,7 @@ async def api_pause_agent(slug: str, lead_id: str, body: PauseIn | None = None, 
     """Pausa ou retoma o agente (humano assume a conversa)."""
     ws = get_workspace_by_slug(slug)
     if not ws:
-        raise HTTPException(status_code=404, detail="Workspace nao encontrado")
+        raise HTTPException(status_code=404, detail="Lead nao encontrado" if False else "Workspace nao encontrado")
     lead = get_lead_by_id(ws["id"], lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead nao encontrado")
