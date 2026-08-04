@@ -1,5 +1,5 @@
 """
-ForceIA - Runtime multi-tenant dos agentes (inteligencia + BANT + META).
+ForceIA - Runtime multi-tenant dos agentes (inteligencia + BANT + META + playbook).
 """
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ from intelligence import (
 )
 from logging_config import get_logger
 from openai import OpenAI
+from playbook import extract_playbook_from_workspace
 from prompts import load_prompt
 from state_machine import can_transition, next_agent_for_stage
 from utils import strip_control_blocks
@@ -74,9 +75,15 @@ def build_messages(
     lead: dict,
     workspace_name: str,
     workspace_id: str | None = None,
+    playbook: dict | None = None,
 ) -> list[dict]:
     base = load_prompt(agent, workspace_id=workspace_id)
-    system = build_system_prompt(base, lead, workspace_name=workspace_name)
+    system = build_system_prompt(
+        base,
+        lead,
+        workspace_name=workspace_name,
+        playbook=playbook,
+    )
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
     for h in history:
         role = h.get("role")
@@ -103,6 +110,7 @@ def generate_reply(
         raise RuntimeError("OPENAI_API_KEY nao configurada (workspace nem .env)")
     client = _openai_client(ws.openai_api_key)
     lead = lead or {"stage": "sdr", "bant": {}, "metadata": {}}
+    playbook = extract_playbook_from_workspace(ws.raw)
     messages = build_messages(
         agent,
         history,
@@ -110,6 +118,7 @@ def generate_reply(
         lead=lead,
         workspace_name=ws.name or "ForceIA",
         workspace_id=ws.id,
+        playbook=playbook,
     )
     model = ws.gpt_model
     temperature = _AGENT_TEMPERATURE.get(agent, 0.6)
@@ -148,6 +157,7 @@ def generate_reply(
                     "stage": (lead or {}).get("stage"),
                     "temperature": temperature,
                     "workspace": ws.slug,
+                    "playbook": bool(playbook and (playbook.get("company_name") or playbook.get("product_summary"))),
                 },
                 usage=usage,
             )
@@ -242,7 +252,6 @@ def _handle_incoming_legacy(
         log.info("lead criado", extra={"workspace": ws.slug, "phone": number})
         sync_twenty(ws, lead)
 
-    # Humano assumiu: grava mensagem do lead, nao responde com IA
     if is_agent_paused(lead):
         add_message(lead["id"], "user", text)
         if message_id:
@@ -257,7 +266,7 @@ def _handle_incoming_legacy(
             "agente pausado — mensagem gravada sem resposta",
             extra={"workspace": ws.slug, "phone": number},
         )
-        upsert_lead(ws.id, number)  # touch last_message_at
+        upsert_lead(ws.id, number)
         return ""
 
     stage = lead.get("stage") or "sdr"
