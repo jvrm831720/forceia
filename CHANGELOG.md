@@ -2,6 +2,14 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.7.0]
+
+### Adicionado
+- **Tela de lead + transcript** no console admin:
+  - `GET /api/workspaces/{slug}/leads/{lead_id}` (lead + mensagens, META strip)
+  - `get_lead_by_id` multi-tenant em `db.py`
+  - UI React: clique no lead → BANT + chat ordenado
+
 ## [1.6.1]
 
 ### Adicionado
