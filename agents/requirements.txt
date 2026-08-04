@@ -24,3 +24,6 @@ langfuse>=2.0.0
 
 # Integrações (opcional — instale se FORCEIA_COMPOSIO=1)
 # composio>=0.7.0
+
+# Scraping pesado (opcional). O scraper de hiring signals usa httpx por padrão.
+# scrapy>=2.11.0
