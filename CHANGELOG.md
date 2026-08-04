@@ -2,106 +2,69 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.8.0]
+
+### Adicionado
+- **Notas internas no lead**
+  - `POST /api/workspaces/{slug}/leads/{lead_id}/notes`
+  - Evento `internal_note` + espelho em `metadata.notes`
+  - UI: compositor + lista no detalhe do lead
+- **Timeline de eventos do lead**
+  - `list_events_for_lead` + incluso em `GET .../leads/{id}`
+  - `GET /api/workspaces/{slug}/leads/{lead_id}/events`
+  - Painel no detalhe com tipo, resumo e horário
+- **Assumir conversa / pausar agente**
+  - `POST /api/workspaces/{slug}/leads/{lead_id}/pause` `{paused, reason}`
+  - `metadata.agent_paused` / `human_takeover`
+  - Runtime (`run_sdr`, LangGraph, follow-up) grava msg do lead e **não** responde
+  - UI: botão Assumir/Retomar + badge "humano" / ⏸ na lista
+
 ## [1.7.1]
 
 ### Adicionado
-- **Melhorias na tela de lead + transcript**:
-  - Busca por telefone/nome/empresa e filtro por estágio na lista
-  - `PATCH /api/workspaces/{slug}/leads/{lead_id}` para mudar estágio (e name/company/email)
-  - Evento `stage_changed` com source=admin
-  - `update_lead_fields` multi-tenant em `db.py`
-  - Auto-scroll do transcript, cores por agente (SDR/Closer/Follow-up)
-  - Badge de estágio, link WhatsApp, Esc fecha detalhe, BANT "não coletado"
-  - Contador filtrado e botão Atualizar no detalhe
+- Melhorias na tela de lead + transcript (filtros, PATCH stage, cores por agente, auto-scroll, WhatsApp)
 
 ## [1.7.0]
 
 ### Adicionado
-- **Tela de lead + transcript** no console admin:
-  - `GET /api/workspaces/{slug}/leads/{lead_id}` (lead + mensagens, META strip)
-  - `get_lead_by_id` multi-tenant em `db.py`
-  - UI React: clique no lead → BANT + chat ordenado
+- Tela de lead + transcript (`GET .../leads/{id}`)
 
 ## [1.6.1]
 
 ### Adicionado
-- **Política de senha forte** (`validate_password_strength`):
-  min 12 chars, maiúscula, minúscula, dígito, símbolo; bloqueia placeholders
-  - `ADMIN_PASSWORD` fraca → login JWT recusado + aviso no boot
-  - `FORCEIA_ALLOW_WEAK_PASSWORD=1` só para dev
+- Política de senha forte no login JWT
 
 ## [1.6.0]
 
 ### Adicionado
-- **Auth JWT** no painel admin (`agents/auth.py`):
-  - `POST /api/auth/login` → access_token (HS256)
-  - `GET /api/auth/me` claims do operador
-  - `ADMIN_USER` / `ADMIN_PASSWORD` / `JWT_SECRET` / `JWT_EXPIRE_MINUTES`
-  - Compatível com `ADMIN_TOKEN` legado
-- Testes `tests/test_auth.py`
+- Auth JWT no painel admin
 
 ## [1.5.0]
 
 ### Adicionado
-- **Langfuse** observabilidade (`agents/observability.py`):
-  - Trace `forceia.turn` por mensagem (session = workspace:phone)
-  - Spans prepare/generate/parse/route/persist + generation OpenAI
-  - Eventos meta_extracted, transition, turn_error
-  - Docs `docs/OBSERVABILITY.md`
+- Langfuse observabilidade
 
 ## [1.4.0]
 
 ### Adicionado
-- **LangGraph** como orquestrador do funil (`agents/graph.py`):
-  - StateGraph: prepare → generate (retry) → parse → route → persist
-  - Checkpoints por lead (`thread_id = workspace:phone`), MemorySaver ou SQLite
-  - `FORCEIA_USE_GRAPH=1` (padrao) com fallback automatico para fluxo legado
-- Dependencias: `langgraph`, `langchain-core`
-
-### Alterado
-- `run_sdr.handle_incoming` delega ao grafo quando disponivel
-- `state_machine.py` permanece como regras de transicao (fonte unica)
+- LangGraph orquestrador do funil
 
 ## [1.3.0]
 
 ### Adicionado
-- **STaR + SPIN no ciclo de learning** (prompt-level, sem fine-tune de pesos):
-  - SPIN: pares preferência `real`(won) vs `generated`(lost) + discriminator
-  - STaR: racionalização de lost (counterfactual + filtro de qualidade)
-  - Modos CLI: `--mode hybrid|spin|star|classic`
-  - `--export-prefs PATH` exporta dataset no schema SPIN/HF
-- Testes de pares SPIN e export (`test_learning.py`).
+- STaR + SPIN no ciclo de learning
 
 ## [1.2.0]
 
 ### Adicionado
-- **Auto-melhoria assistida** (`learning.py`, `improve_agents.py`):
-  analisa leads won/lost, gera `prompt_suggestions` e só entra em produção
-  após aprovação humana (`--approve` / `--apply` ou API admin).
-- Tabelas `learning_runs`, `prompt_suggestions`, `agent_prompt_overrides`
-  (`supabase/learning.sql`).
-- Overrides de prompt por workspace no `load_prompt`.
-- Endpoints admin `/api/learning/*`.
-- Docs `docs/LEARNING.md` e testes `test_learning.py`.
+- Auto-melhoria assistida
 
 ## [1.1.0]
 
 ### Adicionado
-- Camada `intelligence.py`: BANT persistente, score 0-100, bloco `---META---`,
-  extracao de nome/empresa/email, contexto vivo no system prompt.
-- Prompts de SDR/Closer/Follow-up reescritos (playbook WhatsApp B2B BR).
-- Auto-qualificacao quando BANT atinge score minimo.
-- Handoff humano via `handoff: true` no META.
-- Testes de inteligencia (`test_intelligence.py`).
-
-### Alterado
-- `run_sdr.py` injeta memoria do lead e temperatura por agente.
-- Follow-up job usa historico + BANT para personalizar mensagem.
-- Tags legadas ainda funcionam; META e o protocolo preferencial.
+- Camada intelligence BANT/META
 
 ## [1.0.0]
 
 ### Adicionado
-- **Painel admin** (`admin_server.py` + `static/admin.html`).
-- Webhook com idempotencia e token opcional.
-- Logging estruturado, testes, CI, Docker, Makefile.
+- Painel admin, webhook, testes, Docker
