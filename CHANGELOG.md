@@ -2,6 +2,23 @@
 
 Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
+## [1.9.0]
+
+### Adicionado
+- **Camada de integrações (Fase 0 + 1)**
+  - ADR: `docs/INTEGRATIONS.md`
+  - `agents/integrations/` — `base`, `registry`, `composio_client`
+  - Sessão Composio por workspace (`metadata.composio_session_id`)
+  - Allowlist `FORCEIA_COMPOSIO_TOOLKITS` (Calendar, Gmail, Slack, Outlook…)
+  - API admin:
+    - `GET  /api/workspaces/{slug}/integrations`
+    - `POST /api/workspaces/{slug}/integrations/{toolkit}/connect`
+    - `POST /api/workspaces/{slug}/integrations/{toolkit}/disconnect`
+    - `GET  /api/integrations/health`
+  - `update_workspace_metadata` em `db.py`
+  - Testes: `agents/tests/test_integrations.py`
+  - Migration opcional: `supabase/integrations.sql`
+
 ## [1.8.0]
 
 ### Adicionado
@@ -38,33 +55,3 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Adicionado
 - Auth JWT no painel admin
-
-## [1.5.0]
-
-### Adicionado
-- Langfuse observabilidade
-
-## [1.4.0]
-
-### Adicionado
-- LangGraph orquestrador do funil
-
-## [1.3.0]
-
-### Adicionado
-- STaR + SPIN no ciclo de learning
-
-## [1.2.0]
-
-### Adicionado
-- Auto-melhoria assistida
-
-## [1.1.0]
-
-### Adicionado
-- Camada intelligence BANT/META
-
-## [1.0.0]
-
-### Adicionado
-- Painel admin, webhook, testes, Docker
