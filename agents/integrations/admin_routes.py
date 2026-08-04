@@ -131,3 +131,11 @@ def mount_integration_routes(app, require_token):
         mount_elite_routes(app, require_admin=require_token)
     except Exception:
         pass
+
+    # Experiência de produto (Prioridade 3)
+    try:
+        from product_routes import mount_product_routes
+
+        mount_product_routes(app, require_admin=require_token)
+    except Exception:
+        pass
