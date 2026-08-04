@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const STAGE_COLORS: Record<string, string> = {
   sdr: "var(--sdr)",
@@ -9,6 +9,11 @@ const STAGE_COLORS: Record<string, string> = {
   lost: "var(--lost)",
 };
 const STAGE_ORDER = ["sdr", "qualified", "closer", "followup", "won", "lost"];
+const AGENT_COLORS: Record<string, string> = {
+  sdr: "var(--sdr)",
+  closer: "var(--closer)",
+  followup: "var(--followup)",
+};
 const TOKEN_KEY = "forceia_admin_token";
 
 type Workspace = { id: string; name: string; slug: string };
@@ -73,6 +78,26 @@ function fmtDate(s?: string | null) {
   });
 }
 
+function fmtDateFull(s?: string | null) {
+  if (!s) return "—";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function waLink(phone?: string) {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  return `https://wa.me/${digits}`;
+}
+
 type Tab = "overview" | "leads" | "events" | "learning";
 
 export default function App() {
@@ -99,6 +124,10 @@ export default function App() {
   const [leadDetail, setLeadDetail] = useState<LeadDetail | null>(null);
   const [leadDetailLoading, setLeadDetailLoading] = useState(false);
   const [leadDetailErr, setLeadDetailErr] = useState("");
+  const [stageBusy, setStageBusy] = useState(false);
+  const [leadFilter, setLeadFilter] = useState("");
+  const [stageFilter, setStageFilter] = useState<string>("all");
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const loadWorkspaces = useCallback(async () => {
     const wss = await api<Workspace[]>("/api/workspaces");
@@ -112,11 +141,13 @@ export default function App() {
     setSelectedLeadId(null);
     setLeadDetail(null);
     setLeadDetailErr("");
+    setLeadFilter("");
+    setStageFilter("all");
     setSub("carregando…");
     try {
       const [m, l, ev] = await Promise.all([
         api<Metrics>(`/api/workspaces/${slug}/metrics`),
-        api<Lead[]>(`/api/workspaces/${slug}/leads?limit=60`),
+        api<Lead[]>(`/api/workspaces/${slug}/leads?limit=80`),
         api<EventRow[]>(`/api/workspaces/${slug}/events?limit=40`),
       ]);
       setMetrics(m);
@@ -144,7 +175,7 @@ export default function App() {
       setLeadDetailErr("");
       try {
         const data = await api<LeadDetail>(
-          `/api/workspaces/${current}/leads/${leadId}?messages_limit=150`,
+          `/api/workspaces/${current}/leads/${leadId}?messages_limit=200`,
         );
         setLeadDetail(data);
         setSelectedLeadId(leadId);
@@ -156,6 +187,32 @@ export default function App() {
       }
     },
     [current],
+  );
+
+  const changeLeadStage = useCallback(
+    async (stage: string) => {
+      if (!current || !selectedLeadId || stageBusy) return;
+      setStageBusy(true);
+      try {
+        await api(`/api/workspaces/${current}/leads/${selectedLeadId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ stage }),
+        });
+        await loadLeadDetail(selectedLeadId);
+        // refresh list metrics
+        const [m, l] = await Promise.all([
+          api<Metrics>(`/api/workspaces/${current}/metrics`),
+          api<Lead[]>(`/api/workspaces/${current}/leads?limit=80`),
+        ]);
+        setMetrics(m);
+        setLeads(l);
+      } catch (e) {
+        alert("Falha ao mudar estágio: " + ((e as Error).message || e));
+      } finally {
+        setStageBusy(false);
+      }
+    },
+    [current, selectedLeadId, stageBusy, loadLeadDetail],
   );
 
   useEffect(() => {
@@ -170,6 +227,34 @@ export default function App() {
   useEffect(() => {
     if (tab === "learning") loadLearning();
   }, [tab, loadLearning]);
+
+  useEffect(() => {
+    if (leadDetail && !leadDetailLoading) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [leadDetail, leadDetailLoading]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedLeadId) {
+        setSelectedLeadId(null);
+        setLeadDetail(null);
+        setLeadDetailErr("");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedLeadId]);
+
+  const filteredLeads = useMemo(() => {
+    const q = leadFilter.trim().toLowerCase();
+    return leads.filter((l) => {
+      if (stageFilter !== "all" && (l.stage || "") !== stageFilter) return false;
+      if (!q) return true;
+      const hay = `${l.phone || ""} ${l.name || ""} ${l.company || ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [leads, leadFilter, stageFilter]);
 
   const doLogin = async () => {
     setGateErr("");
@@ -236,6 +321,9 @@ export default function App() {
   const maxStage = Math.max(1, ...STAGE_ORDER.map((s) => metrics?.by_stage?.[s] || 0));
   const activePipe =
     (metrics?.by_stage?.qualified || 0) + (metrics?.by_stage?.closer || 0);
+
+  const detailLead = leadDetail?.lead;
+  const wa = waLink(detailLead?.phone);
 
   return (
     <div className="shell">
@@ -413,10 +501,34 @@ export default function App() {
 
           {tab === "leads" && (
             <div className="lead-layout">
-              <div className="card full">
-                <h2>Leads recentes</h2>
-                {!leads.length ? (
-                  <div className="empty">Sem leads</div>
+              <div className="card full lead-list-card">
+                <div className="lead-list-head">
+                  <h2>Leads</h2>
+                  <div className="lead-filters">
+                    <input
+                      className="filter-input"
+                      placeholder="Buscar telefone, nome, empresa…"
+                      value={leadFilter}
+                      onChange={(e) => setLeadFilter(e.target.value)}
+                    />
+                    <select
+                      className="filter-select"
+                      value={stageFilter}
+                      onChange={(e) => setStageFilter(e.target.value)}
+                    >
+                      <option value="all">Todos estágios</option>
+                      {STAGE_ORDER.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {!filteredLeads.length ? (
+                  <div className="empty">
+                    {leads.length ? "Nenhum lead com esse filtro" : "Sem leads"}
+                  </div>
                 ) : (
                   <table className="lead-tbl">
                     <thead>
@@ -429,7 +541,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {leads.map((l) => (
+                      {filteredLeads.map((l) => (
                         <tr
                           key={l.id || l.phone}
                           className={
@@ -456,77 +568,166 @@ export default function App() {
                     </tbody>
                   </table>
                 )}
+                <div className="lead-list-foot">
+                  {filteredLeads.length} de {leads.length} leads
+                </div>
               </div>
 
-              <div className="card full">
+              <div className="card full lead-detail-card">
                 <div className="lead-detail-head">
                   <div>
-                    <h3>
-                      {leadDetail?.lead?.name ||
-                        leadDetail?.lead?.phone ||
-                        (selectedLeadId ? "Lead" : "Selecione um lead")}
-                    </h3>
+                    <div className="lead-title-row">
+                      <h3>
+                        {detailLead?.name ||
+                          detailLead?.phone ||
+                          (selectedLeadId ? "Lead" : "Selecione um lead")}
+                      </h3>
+                      {detailLead?.stage && (
+                        <span
+                          className="tag stage-badge"
+                          style={{ color: STAGE_COLORS[detailLead.stage] || "var(--muted)" }}
+                        >
+                          {detailLead.stage}
+                        </span>
+                      )}
+                    </div>
                     <div className="sub" style={{ marginTop: 4 }}>
                       {leadDetail
-                        ? `${leadDetail.message_count} msgs · ${leadDetail.lead.stage || ""}`
+                        ? `${leadDetail.message_count} msgs · atualizado ${fmtDateFull(detailLead?.updated_at)}`
                         : "Clique em uma linha para ver o transcript"}
                     </div>
                   </div>
-                  {selectedLeadId && (
-                    <button
-                      className="btn btn-ghost"
-                      onClick={() => {
-                        setSelectedLeadId(null);
-                        setLeadDetail(null);
-                      }}
-                    >
-                      Fechar
-                    </button>
-                  )}
+                  <div className="lead-detail-actions">
+                    {selectedLeadId && (
+                      <>
+                        <button
+                          className="btn btn-ghost"
+                          disabled={leadDetailLoading}
+                          onClick={() => selectedLeadId && loadLeadDetail(selectedLeadId)}
+                        >
+                          Atualizar
+                        </button>
+                        {wa && (
+                          <a className="btn btn-ghost" href={wa} target="_blank" rel="noreferrer">
+                            WhatsApp
+                          </a>
+                        )}
+                        <button
+                          className="btn btn-ghost"
+                          onClick={() => {
+                            setSelectedLeadId(null);
+                            setLeadDetail(null);
+                            setLeadDetailErr("");
+                          }}
+                        >
+                          Fechar
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {leadDetailLoading && <div className="empty">Carregando transcript…</div>}
                 {leadDetailErr && <div className="err">{leadDetailErr}</div>}
 
-                {leadDetail && !leadDetailLoading && (
+                {leadDetail && !leadDetailLoading && detailLead && (
                   <>
+                    <div className="lead-ops">
+                      <label className="ops-label">Mudar estágio</label>
+                      <select
+                        className="filter-select stage-select"
+                        value={detailLead.stage || "sdr"}
+                        disabled={stageBusy}
+                        onChange={(e) => void changeLeadStage(e.target.value)}
+                      >
+                        {STAGE_ORDER.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                      {stageBusy && <span className="ops-hint">salvando…</span>}
+                    </div>
+
                     <div className="bant-grid">
-                      {(["need", "authority", "budget", "timeline"] as const).map((k) => (
-                        <div className="bant-item" key={k}>
-                          <div className="k">{k}</div>
-                          <div className="v">
-                            {(leadDetail.lead.bant && leadDetail.lead.bant[k]) || "—"}
+                      {(["need", "authority", "budget", "timeline"] as const).map((k) => {
+                        const val = (detailLead.bant && detailLead.bant[k]) || "";
+                        return (
+                          <div className={"bant-item" + (val ? " filled" : "")} key={k}>
+                            <div className="k">{k}</div>
+                            <div className={"v" + (val ? "" : " empty")}>
+                              {val || "não coletado"}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
+
                     <div className="meta-kv">
-                      {leadDetail.lead.company
-                        ? `Empresa: ${leadDetail.lead.company} · `
-                        : ""}
-                      {leadDetail.lead.email ? `Email: ${leadDetail.lead.email} · ` : ""}
-                      Tel: {leadDetail.lead.phone || "—"}
+                      {detailLead.company ? (
+                        <span>
+                          <b>Empresa</b> {detailLead.company}
+                        </span>
+                      ) : null}
+                      {detailLead.email ? (
+                        <span>
+                          <b>Email</b> {detailLead.email}
+                        </span>
+                      ) : null}
+                      <span>
+                        <b>Tel</b> {detailLead.phone || "—"}
+                      </span>
+                      <span>
+                        <b>Criado</b> {fmtDateFull(detailLead.created_at)}
+                      </span>
                     </div>
-                    <h2 style={{ marginTop: 16 }}>Transcript</h2>
+
+                    <div className="transcript-head">
+                      <h2>Transcript</h2>
+                      <span className="transcript-count">{leadDetail.message_count} mensagens</span>
+                    </div>
                     {!leadDetail.messages.length ? (
                       <div className="empty">Sem mensagens ainda</div>
                     ) : (
                       <div className="chat-scroll">
                         {leadDetail.messages.map((m, i) => {
                           const role = (m.role || "assistant").toLowerCase();
-                          const isUser = role === "user" || role === "human" || role === "lead";
+                          const isUser =
+                            role === "user" || role === "human" || role === "lead";
+                          const agent = (m.agent || "").toLowerCase();
+                          const agentColor = AGENT_COLORS[agent];
                           return (
                             <div
                               key={`${m.created_at}-${i}`}
                               className={"chat-row " + (isUser ? "user" : "assistant")}
                             >
-                              <div className="chat-bubble">{m.content || ""}</div>
+                              <div
+                                className="chat-bubble"
+                                style={
+                                  !isUser && agentColor
+                                    ? { borderColor: agentColor + "55" }
+                                    : undefined
+                                }
+                              >
+                                {m.content || ""}
+                              </div>
                               <div className="chat-meta">
-                                {isUser ? "lead" : m.agent || role} · {fmtDate(m.created_at)}
+                                {isUser ? (
+                                  "lead"
+                                ) : (
+                                  <span
+                                    className="agent-pill"
+                                    style={agentColor ? { color: agentColor } : undefined}
+                                  >
+                                    {m.agent || role}
+                                  </span>
+                                )}{" "}
+                                · {fmtDate(m.created_at)}
                               </div>
                             </div>
                           );
                         })}
+                        <div ref={chatEndRef} />
                       </div>
                     )}
                   </>
