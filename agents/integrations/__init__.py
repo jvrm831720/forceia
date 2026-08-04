@@ -20,6 +20,7 @@ from .composio_client import (
     authorize,
 )
 from .registry import get_workspace_integrations, toolkit_catalog
+from .actions import run_agent_actions
 
 __all__ = [
     "AuthorizeResult",
@@ -37,4 +38,5 @@ __all__ = [
     "list_available_toolkits",
     "list_connected",
     "toolkit_catalog",
+    "run_agent_actions",
 ]
