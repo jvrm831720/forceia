@@ -116,7 +116,6 @@ def mount_integration_routes(app, require_token):
             "toolkits": [t.slug for t in list_available_toolkits()],
         }
 
-    # Playbook por workspace (Prioridade 1)
     try:
         from playbook_routes import mount_playbook_routes
 
@@ -124,7 +123,6 @@ def mount_integration_routes(app, require_token):
     except Exception:
         pass
 
-    # Inteligência de elite (Prioridade 2)
     try:
         from elite_routes import mount_elite_routes
 
@@ -132,10 +130,16 @@ def mount_integration_routes(app, require_token):
     except Exception:
         pass
 
-    # Experiência de produto (Prioridade 3)
     try:
         from product_routes import mount_product_routes
 
         mount_product_routes(app, require_admin=require_token)
+    except Exception:
+        pass
+
+    try:
+        from trust_routes import mount_trust_routes
+
+        mount_trust_routes(app, require_admin=require_token)
     except Exception:
         pass
