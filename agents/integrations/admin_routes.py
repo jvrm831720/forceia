@@ -143,3 +143,10 @@ def mount_integration_routes(app, require_token):
         mount_trust_routes(app, require_admin=require_token)
     except Exception:
         pass
+
+    try:
+        from skills_routes import mount_skills_routes
+
+        mount_skills_routes(app, require_admin=require_token)
+    except Exception:
+        pass
