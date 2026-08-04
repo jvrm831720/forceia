@@ -1,5 +1,5 @@
 """
-ForceIA — autenticação JWT do painel admin.
+ForceIA — autenticação JWT do painel admin (hardened).
 
 Fluxo:
   1. POST /api/auth/login  { username, password }  →  { access_token, token_type, expires_in }
@@ -10,11 +10,11 @@ Compatibilidade:
     para scripts/CI existentes. Preferir JWT em produção.
 
 Env:
-  JWT_SECRET          obrigatório em produção (HS256)
+  JWT_SECRET          obrigatório em produção (HS256, ≥32 chars)
   JWT_EXPIRE_MINUTES  default 480 (8h)
   ADMIN_USER          default "admin"
-  ADMIN_PASSWORD      senha do operador
-  ADMIN_TOKEN         token estático legado (opcional)
+  ADMIN_PASSWORD      senha do operador (política forte)
+  ADMIN_TOKEN         token estático legado (opcional; evite em prod)
 """
 
 from __future__ import annotations
@@ -61,10 +61,6 @@ class TokenOut(BaseModel):  # type: ignore[misc]
     username: str
 
 
-# ---------------------------------------------------------------------------
-# Política de senha forte
-# ---------------------------------------------------------------------------
-
 MIN_PASSWORD_LENGTH = 12
 COMMON_PASSWORDS = frozenset(
     {
@@ -90,15 +86,6 @@ COMMON_PASSWORDS = frozenset(
 
 
 def validate_password_strength(password: str) -> list[str]:
-    """
-    Retorna lista de falhas da política. Lista vazia = senha forte o bastante.
-
-    Regras:
-      - mínimo 12 caracteres
-      - ao menos 1 minúscula, 1 maiúscula, 1 dígito, 1 símbolo
-      - não pode ser senha comum / placeholder
-      - não pode ser só espaços
-    """
     errors: list[str] = []
     if password is None:
         return ["senha obrigatoria"]
@@ -134,16 +121,11 @@ def is_strong_password(password: str) -> bool:
 
 
 def password_policy_enabled() -> bool:
-    """Por padrão exige senha forte. FORCEIA_ALLOW_WEAK_PASSWORD=1 relaxa (só dev)."""
     flag = (os.getenv("FORCEIA_ALLOW_WEAK_PASSWORD") or "").strip().lower()
     return flag not in {"1", "true", "yes", "on"}
 
 
 def assert_admin_password_policy() -> list[str]:
-    """
-    Valida ADMIN_PASSWORD do ambiente.
-    Retorna lista de erros (vazia se ok ou se só ADMIN_TOKEN legado).
-    """
     pwd = (os.getenv("ADMIN_PASSWORD") or "").strip()
     if not pwd:
         return []
@@ -164,7 +146,7 @@ def _jwt_secret() -> str:
 
 def _expire_minutes() -> int:
     try:
-        return max(5, int(os.getenv("JWT_EXPIRE_MINUTES", "480")))
+        return max(5, min(int(os.getenv("JWT_EXPIRE_MINUTES", "480")), 60 * 24 * 7))
     except ValueError:
         return 480
 
@@ -205,6 +187,7 @@ def create_access_token(
         "exp": int((now + timedelta(minutes=minutes)).timestamp()),
         "iss": "forceia-admin",
         "type": "access",
+        "jti": secrets.token_hex(8),
     }
     if extra:
         payload.update(extra)
@@ -245,6 +228,13 @@ def _extract_bearer(authorization: str | None) -> str | None:
 def _legacy_token_ok(candidate: str | None) -> bool:
     legacy = (os.getenv("ADMIN_TOKEN") or "").strip()
     if not legacy or not candidate:
+        return False
+    # Em produção, ADMIN_TOKEN legado pode ser desligado
+    if (os.getenv("FORCEIA_DISABLE_LEGACY_TOKEN") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
         return False
     return secrets.compare_digest(candidate, legacy)
 
