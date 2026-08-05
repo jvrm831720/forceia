@@ -3,6 +3,7 @@ import type {
   Conversation,
   ConversationFilter,
   ConversationStatus,
+  MessageSender,
 } from "@/types/conversation";
 
 export function agentLabel(role: AgentRole): string {
@@ -57,8 +58,16 @@ export function channelLabel(channel: Conversation["channel"]): string {
   }
 }
 
+/**
+ * Formata horário/data para lista e balões.
+ * Hoje → HH:mm · Ontem → "Ontem" · demais → data curta (pt-BR).
+ * Datas inválidas retornam string vazia.
+ */
 export function formatMessageTime(iso: string): string {
+  if (!iso) return "";
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+
   const now = new Date();
   const sameDay =
     d.getFullYear() === now.getFullYear() &&
@@ -87,13 +96,38 @@ export function formatMessageTime(iso: string): string {
   });
 }
 
+/** Alias usado pela lista de conversas (mesmo comportamento de formatMessageTime). */
+export function formatListTime(iso: string): string {
+  return formatMessageTime(iso);
+}
+
 export function dateKey(iso: string): string {
+  if (!iso) return "";
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "2-digit",
     month: "long",
   });
+}
+
+/**
+ * Alinhamento semântico do balão conforme o remetente.
+ * lead → left | ai/human → right | system → center
+ */
+export function senderBubbleAlign(
+  sender: MessageSender
+): "left" | "right" | "center" {
+  switch (sender) {
+    case "lead":
+      return "left";
+    case "ai":
+    case "human":
+      return "right";
+    case "system":
+      return "center";
+  }
 }
 
 export function filterConversations(
