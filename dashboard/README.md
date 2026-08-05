@@ -30,7 +30,7 @@ Console premium para o **cliente** da ForceIA acompanhar a equipe de vendas com 
 
 ```bash
 cd dashboard
-npm ci
+npm install
 npm run dev
 ```
 
@@ -46,8 +46,8 @@ Na Vercel, crie o projeto apontando para este repositório e configure:
 |--------|--------|
 | **Framework Preset** | Next.js |
 | **Root Directory** | `dashboard` |
-| **Install Command** | `npm ci` (padrão com lockfile) |
-| **Build Command** | `npm run build` (padrão) |
+| **Install Command** | `npm install` |
+| **Build Command** | `npm run build` |
 | **Output Directory** | *deixar vazio* (Next.js gerencia `.next`) |
 | **Node.js** | 20.x (recomendado) |
 
@@ -75,14 +75,16 @@ Tipos em `types/dashboard.ts`. Substitua a função por fetch à API quando disp
 
 ```
 dashboard/
-├── app/                    # rotas (Dashboard em page.tsx)
+├── app/
 ├── components/
-│   ├── dashboard/          # Hero, métricas, equipe, atividade, atenção, agenda
-│   ├── layout/             # Sidebar, Header
-│   └── ui/                 # Button, Card, Badge
-├── lib/                    # utils + data layer
-├── types/                  # contratos TypeScript
+│   ├── dashboard/
+│   ├── layout/
+│   └── ui/
+├── lib/
+├── types/
 ├── package.json
-├── package-lock.json
-└── next.config.mjs
+├── next.config.mjs
+├── tailwind.config.ts
+├── tsconfig.json
+└── postcss.config.mjs
 ```
