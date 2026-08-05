@@ -1,86 +1,50 @@
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { AgentCard } from "@/types/dashboard";
-import { Bot, Handshake, RefreshCw } from "lucide-react";
+import type { AgentCard, AgentStatus } from "@/types/dashboard";
 
-const ROLE_ICON = {
-  sdr: Bot,
-  closer: Handshake,
-  followup: RefreshCw,
-} as const;
-
-function statusLabel(status: AgentCard["status"]) {
-  if (status === "working") return "Trabalhando";
-  if (status === "paused") return "Pausado";
-  return "Offline";
-}
+const STATUS: Record<AgentStatus, { label: string; variant: "success" | "muted" | "warning"; dot: string }> = {
+  working: { label: "Trabalhando", variant: "success", dot: "bg-success" },
+  paused: { label: "Pausado", variant: "warning", dot: "bg-warning" },
+  offline: { label: "Offline", variant: "muted", dot: "bg-ink-soft" },
+};
 
 export function TeamSection({ agents }: { agents: AgentCard[] }) {
   return (
     <section>
-      <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h2 className="font-display text-xl font-semibold tracking-tight text-ink">
-            Sua Equipe IA
-          </h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Especialistas digitais operando a jornada comercial por você.
-          </p>
-        </div>
-        <Badge variant="ai">3 agentes ativos</Badge>
+      <div className="mb-3 flex items-baseline justify-between">
+        <h2 className="font-display text-sm font-semibold tracking-tight text-ink">Equipe de IA</h2>
+        <p className="text-xs text-ink-soft">{agents.length} agentes</p>
       </div>
-
-      <div className="grid gap-3 md:grid-cols-3">
-        {agents.map((agent) => {
-          const Icon =
-            ROLE_ICON[agent.id as keyof typeof ROLE_ICON] ?? Bot;
-          const working = agent.status === "working";
-
-          return (
-            <Card key={agent.id} className="overflow-hidden">
-              <div className="h-1 w-full bg-gradient-to-r from-ai/80 via-brand/50 to-transparent" />
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-ai-soft text-ai">
-                    <Icon className="h-5 w-5" strokeWidth={1.75} />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">{agent.name}</CardTitle>
-                    <p className="text-xs text-ink-soft">{agent.role}</p>
-                  </div>
+      <div className="overflow-hidden rounded-lg border border-border">
+        <div className="grid grid-cols-12 gap-4 border-b border-border bg-surface-hover/50 px-4 py-2 text-label">
+          <div className="col-span-4">Agente</div>
+          <div className="col-span-2">Status</div>
+          <div className="col-span-6 hidden sm:block">Métricas</div>
+        </div>
+        <div className="divide-y divide-border">
+          {agents.map((agent) => {
+            const st = STATUS[agent.status];
+            return (
+              <div key={agent.id} className="grid grid-cols-12 items-center gap-4 px-4 py-3 transition-ui hover:bg-surface-hover">
+                <div className="col-span-4 min-w-0">
+                  <p className="truncate text-sm font-medium text-ink">{agent.name}</p>
+                  <p className="truncate text-xs text-ink-soft">{agent.role}</p>
                 </div>
-                <Badge variant={working ? "success" : "muted"}>
-                  <span
-                    className={cn(
-                      "h-1.5 w-1.5 rounded-full",
-                      working ? "bg-success" : "bg-ink-soft"
-                    )}
-                  />
-                  {statusLabel(agent.status)}
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
-                  Hoje
-                </p>
-                <ul className="space-y-2">
+                <div className="col-span-2">
+                  <Badge variant={st.variant}><span className={cn("h-1.5 w-1.5 rounded-full", st.dot)} />{st.label}</Badge>
+                </div>
+                <div className="col-span-6 hidden gap-4 sm:flex">
                   {agent.stats.map((s) => (
-                    <li
-                      key={s.label}
-                      className="flex items-center justify-between rounded-xl bg-surface px-3 py-2.5"
-                    >
-                      <span className="text-sm text-ink-muted">{s.label}</span>
-                      <span className="font-display text-lg font-semibold text-ink">
-                        {s.value}
-                      </span>
-                    </li>
+                    <div key={s.label} className="min-w-0">
+                      <p className="text-[11px] text-ink-soft">{s.label}</p>
+                      <p className="text-sm font-semibold tabular-nums text-ink">{s.value}</p>
+                    </div>
                   ))}
-                </ul>
-              </CardContent>
-            </Card>
-          );
-        })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
