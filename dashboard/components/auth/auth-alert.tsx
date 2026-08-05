@@ -1,45 +1,42 @@
-"use client";
-
 import { cn } from "@/lib/utils";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Info } from "lucide-react";
 
-type AuthAlertVariant = "error" | "success" | "info";
-
-const styles: Record<AuthAlertVariant, string> = {
-  error: "bg-alert-soft text-alert border-alert/20",
-  success: "bg-success-soft text-success border-success/20",
-  info: "bg-brand-soft text-brand border-brand/20",
-};
-
-const icons = {
-  error: AlertCircle,
-  success: CheckCircle2,
-  info: AlertCircle,
-};
+const VARIANTS = {
+  error: {
+    wrap: "border-warning/30 bg-warning-soft text-warning",
+    Icon: AlertCircle,
+  },
+  success: {
+    wrap: "border-success/30 bg-success-soft text-success",
+    Icon: CheckCircle2,
+  },
+  info: {
+    wrap: "border-border bg-surface text-ink-muted",
+    Icon: Info,
+  },
+} as const;
 
 export function AuthAlert({
+  variant = "info",
   children,
-  variant = "error",
   className,
 }: {
+  variant?: keyof typeof VARIANTS;
   children: React.ReactNode;
-  variant?: AuthAlertVariant;
   className?: string;
 }) {
-  const Icon = icons[variant];
-
+  const { wrap, Icon } = VARIANTS[variant];
   return (
     <div
       role="alert"
-      aria-live="polite"
       className={cn(
-        "flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-[13px] leading-relaxed",
-        styles[variant],
-        className
+        "flex items-start gap-2 rounded-md border px-3 py-2.5 text-[12px] leading-relaxed",
+        wrap,
+        className,
       )}
     >
-      <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-      <div className="min-w-0">{children}</div>
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+      <div>{children}</div>
     </div>
   );
 }
