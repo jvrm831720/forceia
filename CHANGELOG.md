@@ -1,30 +1,19 @@
 # Changelog
 
-Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
+## 2.4.0 — 2026-08-04
 
-## [1.10.0]
+### P0 — LangGraph wire (elite + trust)
 
-### Adicionado
-- **Integrações Fase 2+3 — tools no Closer**
-  - `integrations/tools/{calendar,email,notify}.py`
-  - `integrations/actions.py`
-  - Nó LangGraph `actions` (`parse → actions → route → persist`)
-  - META `intent=schedule` + `meeting.{title,start,duration_minutes}`
-  - Handoff → Slack se conectado
-  - Prompt Closer: seção de agendamento
-  - Testes: `tests/test_actions.py`
+- **prepare**: enrichment automático, variante A/B estável, detecção de intent lexical e lead score antes do LLM
+- **generate**: resolve prompt A/B (`agent_b` override) e registra `ab_exposure`
+- **parse**: `enforce_guardrails` (preço/prazo), intent refinado META+lexical, score/tier no metadata, auto-qualify por BANT + score/intent
+- **actions**: `execute_closer_actions` (calendar + proposta) além de `run_agent_actions`; `wants_meeting` quando intent=`ready_to_buy`
+- **persist**: `execute_handoff` completo (pausa agente + notifica humano via WhatsApp)
 
-## [1.9.0]
+Flags relevantes (sem mudança de contrato):
+- `FORCEIA_USE_GRAPH` (default 1)
+- `FORCEIA_AB_TESTING` (default 1)
 
-### Adicionado
-- **Camada de integrações (Fase 0 + 1)**
-  - ADR: `docs/INTEGRATIONS.md`
-  - `agents/integrations/` — `base`, `registry`, `composio_client`
-  - Sessão Composio por workspace
-  - API admin de integrações
-  - Testes: `agents/tests/test_integrations.py`
+## Anteriores
 
-## [1.8.0]
-
-### Adicionado
-- Notas internas, timeline de eventos, pausar agente / handoff humano
+Ver commits e README para histórico do MVP multi-tenant, playbook, skills e learning STaR/SPIN.
