@@ -2,7 +2,7 @@ import { AuthBrandPanel } from "./auth-brand-panel";
 
 export function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-surface">
+    <div className="flex min-h-screen bg-background">
       {/* Brand panel — desktop / tablet */}
       <aside className="relative hidden w-[48%] shrink-0 border-r border-border bg-surface lg:flex lg:flex-col">
         <AuthBrandPanel />
