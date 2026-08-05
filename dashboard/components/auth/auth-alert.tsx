@@ -18,10 +18,13 @@ const VARIANTS = {
 
 export function AuthAlert({
   variant = "info",
+  shake = false,
   children,
   className,
 }: {
   variant?: keyof typeof VARIANTS;
+  /** Subtle horizontal shake on error (skipped when prefers-reduced-motion) */
+  shake?: boolean;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -29,13 +32,19 @@ export function AuthAlert({
   return (
     <div
       role="alert"
+      aria-live="polite"
       className={cn(
         "flex items-start gap-2 rounded-md border px-3 py-2.5 text-[12px] leading-relaxed",
         wrap,
+        shake ? "auth-alert-shake" : "auth-alert-enter",
         className,
       )}
     >
-      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+      <Icon
+        className="mt-0.5 h-3.5 w-3.5 shrink-0"
+        strokeWidth={1.75}
+        aria-hidden
+      />
       <div>{children}</div>
     </div>
   );

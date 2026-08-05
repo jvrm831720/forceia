@@ -43,7 +43,9 @@ export function PasswordInput({
         aria-invalid={ariaInvalid}
         aria-describedby={ariaDescribedBy}
         className={cn(
-          "h-9 w-full rounded-md border border-border bg-surface px-3 pr-10 text-[13px] text-ink placeholder:text-ink-soft transition-ui",
+          "h-9 w-full rounded-md border border-border bg-surface px-3 pr-10 text-[13px] text-ink placeholder:text-ink-soft",
+          "transition-ui duration-fast",
+          "hover:border-[#2b2b2b]",
           "focus:border-brand focus:outline-none focus:shadow-focus",
           "disabled:cursor-not-allowed disabled:opacity-50",
           ariaInvalid &&
@@ -54,7 +56,14 @@ export function PasswordInput({
         type="button"
         onClick={() => setVisible((v) => !v)}
         disabled={disabled}
-        className="absolute right-1.5 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-sm text-ink-soft transition-ui hover:bg-surface-hover hover:text-ink focus-visible:outline-none focus-visible:shadow-focus disabled:opacity-50"
+        className={cn(
+          "absolute right-1.5 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-sm",
+          "text-ink-soft transition-ui duration-fast",
+          "hover:bg-surface-hover hover:text-ink",
+          "active:scale-95 active:opacity-80",
+          "focus-visible:outline-none focus-visible:shadow-focus",
+          "disabled:opacity-50",
+        )}
         aria-label={visible ? "Ocultar senha" : "Mostrar senha"}
       >
         {visible ? (
