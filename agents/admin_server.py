@@ -1,7 +1,5 @@
-"""ForceIA Admin — payload comprimido (P2 mounts)."""
-from __future__ import annotations
-import base64, zlib
+"""ForceIA Admin — assembled from source chunks."""
 from pathlib import Path
-_b64 = (Path(__file__).resolve().parent / "_admin_zlib.b64").read_text(encoding="ascii")
-_src = zlib.decompress(base64.b64decode(_b64)).decode("utf-8")
-exec(compile(_src, str(Path(__file__).resolve().parent / "admin_server_impl.py"), "exec"), globals())
+_dir = Path(__file__).resolve().parent
+_src = ''.join((_dir / f'_admin_src_{i}.txt').read_text(encoding='utf-8') for i in range(3))
+exec(compile(_src, str(_dir / 'admin_server_impl.py'), 'exec'), globals())
