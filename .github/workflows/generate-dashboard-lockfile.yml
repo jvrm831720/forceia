@@ -1,0 +1,61 @@
+name: Generate dashboard lockfile
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Generate package-lock.json
+        working-directory: dashboard
+        run: |
+          rm -rf node_modules .next package-lock.json
+          npm install --package-lock-only --ignore-scripts --registry=https://registry.npmjs.org/
+          test -f package-lock.json
+          if grep -nEi 'PLACEHOLDER|localhost|127\.0\.0\.1|artifactory|private-registry|_authToken|35\.245\.43\.102' package-lock.json; then
+            echo "Invalid content found in package-lock.json" >&2
+            exit 1
+          fi
+          grep -q 'registry.npmjs.org' package-lock.json
+          node -e "JSON.parse(require('fs').readFileSync('package-lock.json','utf8'))"
+          echo "Lockfile OK ($(wc -c < package-lock.json) bytes)"
+
+      - name: npm ci
+        working-directory: dashboard
+        run: |
+          rm -rf node_modules .next
+          npm ci --registry=https://registry.npmjs.org/
+
+      - name: TypeScript
+        working-directory: dashboard
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: dashboard
+        run: npm run build
+
+      - name: Commit and push lockfile
+        working-directory: dashboard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo "No lockfile changes to commit"
+            exit 0
+          fi
+          git commit -m "chore(dashboard): add reproducible npm lockfile"
+          git push origin HEAD:${{ github.ref_name }}
