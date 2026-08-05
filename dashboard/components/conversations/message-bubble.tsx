@@ -1,17 +1,17 @@
-import { Badge } from "@/components/ui/badge";
-import { agentLabel, formatMessageTime, senderBubbleAlign } from "@/lib/conversation-utils";
+"use client";
+
 import { cn } from "@/lib/utils";
+import { formatMessageTime } from "@/lib/conversation-utils";
 import type { ConversationMessage } from "@/types/conversation";
+import { Check, CheckCheck } from "lucide-react";
 
 export function MessageBubble({ message }: { message: ConversationMessage }) {
-  const align = senderBubbleAlign(message.sender);
-
   if (message.sender === "system") {
     return (
-      <div className="flex justify-center py-1" role="status">
-        <p className="rounded-full bg-border-soft px-3 py-1 text-[12px] font-medium text-ink-muted">
+      <div className="flex justify-center py-2">
+        <span className="rounded-full bg-border-soft px-3 py-1 text-[11px] font-medium text-ink-muted">
           {message.content}
-        </p>
+        </span>
       </div>
     );
   }
@@ -23,44 +23,56 @@ export function MessageBubble({ message }: { message: ConversationMessage }) {
   return (
     <div
       className={cn(
-        "flex max-w-[min(100%,420px)] flex-col gap-1",
-        align === "right" ? "ml-auto items-end" : "mr-auto items-start"
+        "flex w-full",
+        isLead ? "justify-start" : "justify-end"
       )}
     >
       <div
         className={cn(
-          "rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed shadow-card",
-          isLead && "rounded-tl-md border border-border bg-white text-ink",
-          isAi && "rounded-tr-md bg-ai-soft text-ink",
-          isHuman && "rounded-tr-md bg-brand-soft text-ink"
+          "max-w-[78%] rounded-2xl px-3.5 py-2.5 shadow-card transition duration-200",
+          isLead && "rounded-bl-md bg-white border border-border text-ink",
+          isAi && "rounded-br-md bg-ai-soft text-ink",
+          isHuman && "rounded-br-md bg-brand-soft text-ink"
         )}
       >
-        {isAi && message.agentRole && (
-          <div className="mb-1.5">
-            <Badge variant="ai" className="text-[10px]">
-              IA \u00b7 {agentLabel(message.agentRole)}
-            </Badge>
+        {(isAi || isHuman) && (
+          <div className="mb-1 flex items-center gap-1.5">
+            {isAi && (
+              <span className="inline-flex items-center rounded-full bg-ai/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-ai">
+                IA
+              </span>
+            )}
+            {isHuman && (
+              <span className="inline-flex items-center rounded-full bg-brand/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-brand">
+                Você
+              </span>
+            )}
           </div>
         )}
-        {isHuman && (
-          <div className="mb-1.5">
-            <Badge variant="default" className="text-[10px]">
-              Humano
-            </Badge>
-          </div>
-        )}
-        <p className="whitespace-pre-wrap">{message.content}</p>
-      </div>
-      <div
-        className={cn(
-          "flex items-center gap-1.5 px-1 font-mono text-[11px] text-ink-soft",
-          align === "right" ? "flex-row-reverse" : "flex-row"
-        )}
-      >
-        <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>
-        {message.status && align === "right" && (
-          <span className="capitalize">{message.status === "read" ? "lida" : message.status === "delivered" ? "entregue" : "enviada"}</span>
-        )}
+        <p className="whitespace-pre-wrap text-[13.5px] leading-relaxed">
+          {message.content}
+        </p>
+        <div
+          className={cn(
+            "mt-1.5 flex items-center gap-1",
+            isLead ? "justify-start" : "justify-end"
+          )}
+        >
+          <span className="text-[10px] text-ink-soft">
+            {formatMessageTime(message.timestamp)}
+          </span>
+          {!isLead && message.status && (
+            <span className="text-ink-soft">
+              {message.status === "read" ? (
+                <CheckCheck className="h-3 w-3 text-brand" />
+              ) : message.status === "delivered" ? (
+                <CheckCheck className="h-3 w-3" />
+              ) : (
+                <Check className="h-3 w-3" />
+              )}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,65 +1,73 @@
 "use client";
 
-import { ConversationFilters } from "@/components/conversations/filters";
-import { ConversationItem } from "@/components/conversations/conversation-item";
-import { ConversationsEmptyState } from "@/components/conversations/empty-state";
-import { ConversationSearch } from "@/components/conversations/search";
 import type { Conversation, ConversationFilter } from "@/types/conversation";
+import { filterConversations } from "@/lib/conversation-utils";
+import { ConversationItem } from "./conversation-item";
+import { ConversationFilters } from "./filters";
+import { ConversationSearch } from "./search";
+import { ConversationsEmptyState } from "./empty-state";
 
 export function ConversationList({
   conversations,
   selectedId,
   filter,
-  counts,
-  query,
+  search,
   onFilterChange,
-  onQueryChange,
+  onSearchChange,
   onSelect,
 }: {
   conversations: Conversation[];
   selectedId: string | null;
   filter: ConversationFilter;
-  counts: Record<ConversationFilter, number>;
-  query: string;
+  search: string;
   onFilterChange: (f: ConversationFilter) => void;
-  onQueryChange: (q: string) => void;
+  onSearchChange: (q: string) => void;
   onSelect: (id: string) => void;
 }) {
+  const filtered = filterConversations(conversations, filter, search);
+
+  const counts: Partial<Record<ConversationFilter, number>> = {
+    all: conversations.length,
+    ai: conversations.filter((c) => c.status === "ai_handling").length,
+    attention: conversations.filter((c) => c.status === "needs_attention").length,
+    human: conversations.filter((c) => c.status === "human").length,
+    closed: conversations.filter((c) => c.status === "closed").length,
+  };
+
   return (
-    <aside
-      className="flex h-full w-full flex-col border-r border-border bg-surface-card lg:w-[320px] lg:shrink-0"
-      aria-label="Lista de conversas"
-    >
-      <div className="space-y-3 border-b border-border p-4">
-        <div>
-          <h1 className="font-display text-lg font-semibold tracking-tight text-ink">
-            Conversas
-          </h1>
-          <p className="text-[12px] text-ink-muted">
-            Sua equipe de IA em tempo real
-          </p>
-        </div>
-        <ConversationSearch value={query} onChange={onQueryChange} />
-        <ConversationFilters value={filter} counts={counts} onChange={onFilterChange} />
+    <div className="flex h-full flex-col border-r border-border bg-surface-card">
+      <div className="space-y-3 border-b border-border p-3">
+        <ConversationSearch value={search} onChange={onSearchChange} />
+        <ConversationFilters
+          value={filter}
+          onChange={onFilterChange}
+          counts={counts}
+        />
       </div>
 
-      <div className="flex-1 space-y-1 overflow-y-auto p-2">
-        {conversations.length === 0 ? (
+      <div className="flex-1 overflow-y-auto p-2">
+        {filtered.length === 0 ? (
           <ConversationsEmptyState
-            title="Nada por aqui"
-            description="Ajuste os filtros ou aguarde novas conversas da equipe IA."
+            title={search ? "Nenhum resultado" : "Nenhuma conversa"}
+            description={
+              search
+                ? "Tente outro termo de busca."
+                : "Seus agentes ainda não iniciaram atendimentos neste filtro."
+            }
           />
         ) : (
-          conversations.map((c) => (
-            <ConversationItem
-              key={c.id}
-              conversation={c}
-              selected={selectedId === c.id}
-              onSelect={onSelect}
-            />
-          ))
+          <div className="flex flex-col gap-0.5">
+            {filtered.map((c) => (
+              <ConversationItem
+                key={c.id}
+                conversation={c}
+                selected={selectedId === c.id}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
         )}
       </div>
-    </aside>
+    </div>
   );
 }
