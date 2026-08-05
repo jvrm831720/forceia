@@ -1,6 +1,7 @@
-"""ForceIA LangGraph — carrega implementação completa (P0+P1)."""
+"""ForceIA LangGraph P0+P1 (payload comprimido)."""
+from __future__ import annotations
+import base64, zlib
 from pathlib import Path
-
-_p = Path(__file__).resolve().parent
-_src = "".join((_p / f"_graph_part_{i}.txt").read_text(encoding="utf-8") for i in range(3))
-exec(compile(_src, str(_p / "graph_impl.py"), "exec"), globals())
+_b64 = (Path(__file__).resolve().parent / "_graph_zlib.b64").read_text(encoding="ascii")
+_src = zlib.decompress(base64.b64decode(_b64)).decode("utf-8")
+exec(compile(_src, str(Path(__file__).resolve().parent / "graph_impl.py"), "exec"), globals())
