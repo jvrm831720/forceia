@@ -1,77 +1,33 @@
 import type { Config } from "tailwindcss";
-
 const config: Config = {
-  content: [
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
+  content: ["./app/**/*.{js,ts,jsx,tsx,mdx}","./components/**/*.{js,ts,jsx,tsx,mdx}","./design-system/**/*.{js,ts,jsx,tsx}"],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        surface: {
-          DEFAULT: "#FBFAF8",
-          card: "#FFFFFF",
-        },
-        ink: {
-          DEFAULT: "#111111",
-          muted: "#6B6560",
-          soft: "#9A948C",
-        },
-        border: {
-          DEFAULT: "#e5e2dd",
-          soft: "#f0ede8",
-        },
-        brand: {
-          DEFAULT: "#05B5DB",
-          soft: "rgba(5, 181, 219, 0.12)",
-        },
-        success: {
-          DEFAULT: "#0DA387",
-          soft: "rgba(13, 163, 135, 0.12)",
-        },
-        ai: {
-          DEFAULT: "#9B95FE",
-          soft: "rgba(155, 149, 254, 0.12)",
-        },
-        alert: {
-          DEFAULT: "#DD6539",
-          soft: "rgba(221, 101, 57, 0.12)",
-        },
-        highlight: {
-          DEFAULT: "#F7CA63",
-          soft: "rgba(247, 202, 99, 0.18)",
-        },
+        background: "var(--background)",
+        surface: { DEFAULT: "var(--surface)", hover: "var(--surface-hover)", strong: "var(--surface-strong)", card: "var(--surface)" },
+        ink: { DEFAULT: "var(--foreground)", muted: "var(--muted)", soft: "var(--soft)" },
+        border: { DEFAULT: "var(--border)", soft: "var(--divider)" },
+        brand: { DEFAULT: "var(--brand)", hover: "var(--brand-hover)", soft: "var(--brand-soft)" },
+        success: { DEFAULT: "var(--success)", soft: "var(--success-soft)" },
+        ai: { DEFAULT: "var(--ai)", soft: "var(--ai-soft)" },
+        alert: { DEFAULT: "var(--warning)", soft: "var(--warning-soft)" },
+        warning: { DEFAULT: "var(--warning)", soft: "var(--warning-soft)" },
+        highlight: { DEFAULT: "var(--highlight)", soft: "var(--highlight-soft)" },
+        danger: { DEFAULT: "var(--danger)", soft: "var(--danger-soft)" },
       },
       fontFamily: {
-        sans: [
-          "Inter",
-          "ui-sans-serif",
-          "system-ui",
-          "-apple-system",
-          "Segoe UI",
-          "Roboto",
-          "sans-serif",
-        ],
-        display: [
-          "Outfit",
-          "Inter",
-          "ui-sans-serif",
-          "system-ui",
-          "sans-serif",
-        ],
+        sans: ["Inter","ui-sans-serif","system-ui","sans-serif"],
+        display: ["Outfit","Inter","ui-sans-serif","system-ui","sans-serif"],
+        mono: ["IBM Plex Mono","ui-monospace","monospace"],
       },
-      boxShadow: {
-        card: "0 1px 2px rgba(17, 17, 17, 0.04), 0 4px 16px rgba(17, 17, 17, 0.03)",
-        soft: "0 8px 30px rgba(17, 17, 17, 0.04)",
-        focus: "0 0 0 3px rgba(5, 181, 219, 0.2)",
-      },
-      borderRadius: {
-        xl: "14px",
-        "2xl": "18px",
-      },
+      boxShadow: { sm: "var(--shadow-sm)", card: "var(--shadow-sm)", soft: "var(--shadow-md)", lg: "var(--shadow-lg)", focus: "var(--shadow-focus)" },
+      borderRadius: { xs: "var(--radius-xs)", sm: "var(--radius-sm)", md: "var(--radius-md)", lg: "var(--radius-lg)", xl: "var(--radius-xl)", "2xl": "var(--radius-xl)" },
+      transitionDuration: { fast: "120ms", base: "160ms", slow: "200ms" },
+      transitionTimingFunction: { ui: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
     },
   },
   plugins: [],
 };
-
 export default config;
