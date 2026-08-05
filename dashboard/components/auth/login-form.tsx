@@ -12,7 +12,7 @@ import { PasswordInput } from "./password-input";
 import { cn } from "@/lib/utils";
 
 const fieldClass =
-  "h-9 w-full rounded-md border border-border bg-surface px-3 text-[13px] text-ink placeholder:text-ink-soft transition-ui focus:border-brand focus:outline-none focus:shadow-focus disabled:cursor-not-allowed disabled:opacity-50";
+  "h-9 w-full rounded-md border border-border bg-surface px-3 text-[13px] text-ink placeholder:text-ink-soft transition-ui duration-fast hover:border-[#2b2b2b] focus:border-brand focus:outline-none focus:shadow-focus disabled:cursor-not-allowed disabled:opacity-50";
 
 export function LoginForm() {
   const router = useRouter();
@@ -21,6 +21,7 @@ export function LoginForm() {
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<AuthError | null>(null);
+  const [errorKey, setErrorKey] = useState(0);
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
@@ -37,6 +38,11 @@ export function LoginForm() {
     }
     setFieldErrors(next);
     return Object.keys(next).length === 0;
+  };
+
+  const showError = (err: AuthError) => {
+    setError(err);
+    setErrorKey((k) => k + 1);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,7 +65,7 @@ export function LoginForm() {
         } else if (result.error.code === "empty_password") {
           setFieldErrors({ password: result.error.message });
         } else {
-          setError(result.error);
+          showError(result.error);
         }
         return;
       }
@@ -67,7 +73,7 @@ export function LoginForm() {
       router.replace("/");
       router.refresh();
     } catch {
-      setError({
+      showError({
         code: "connection_error",
         message:
           "Não foi possível acessar sua conta agora. Tente novamente em instantes.",
@@ -98,7 +104,11 @@ export function LoginForm() {
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
-        {error && <AuthAlert variant="error">{error.message}</AuthAlert>}
+        {error && (
+          <AuthAlert key={errorKey} variant="error" shake>
+            {error.message}
+          </AuthAlert>
+        )}
 
         <div>
           <label
@@ -129,7 +139,10 @@ export function LoginForm() {
             )}
           />
           {fieldErrors.email && (
-            <p id="email-error" className="mt-1.5 text-[12px] text-warning">
+            <p
+              id="email-error"
+              className="auth-field-error mt-1.5 text-[12px] text-warning"
+            >
               {fieldErrors.email}
             </p>
           )}
@@ -145,7 +158,7 @@ export function LoginForm() {
             </label>
             <Link
               href="/esqueci-minha-senha"
-              className="text-[12px] text-brand transition-ui hover:opacity-80"
+              className="text-[12px] text-brand transition-ui duration-fast hover:opacity-80 active:opacity-70"
             >
               Esqueci minha senha
             </Link>
@@ -166,19 +179,22 @@ export function LoginForm() {
             }
           />
           {fieldErrors.password && (
-            <p id="password-error" className="mt-1.5 text-[12px] text-warning">
+            <p
+              id="password-error"
+              className="auth-field-error mt-1.5 text-[12px] text-warning"
+            >
               {fieldErrors.password}
             </p>
           )}
         </div>
 
-        <label className="flex items-center gap-2 pt-0.5">
+        <label className="flex cursor-pointer items-center gap-2 pt-0.5">
           <input
             type="checkbox"
             checked={remember}
             onChange={(e) => setRemember(e.target.checked)}
             disabled={loading}
-            className="h-3.5 w-3.5 rounded border-border bg-surface text-brand focus:ring-0 focus:ring-offset-0"
+            className="h-3.5 w-3.5 rounded border-border bg-surface text-brand transition-ui duration-fast focus:ring-0 focus:ring-offset-0"
           />
           <span className="text-[12px] text-ink-muted">Manter conectado</span>
         </label>
@@ -187,15 +203,21 @@ export function LoginForm() {
           type="submit"
           disabled={loading}
           className={cn(
-            "mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-md text-[13px] font-medium transition-ui",
-            "bg-ink text-background hover:opacity-90",
-            "disabled:cursor-not-allowed disabled:opacity-50",
+            "mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-md text-[13px] font-medium",
+            "bg-ink text-background",
+            "transition-ui duration-fast",
+            "hover:opacity-90",
+            "active:scale-[0.99] active:opacity-80",
+            "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100",
             "focus-visible:outline-none focus-visible:shadow-focus",
           )}
         >
           {loading ? (
             <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              <Loader2
+                className="h-3.5 w-3.5 animate-spin"
+                aria-hidden
+              />
               Entrando…
             </>
           ) : (
