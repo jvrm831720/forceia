@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.5.0 — 2026-08-04
+
+### P1 — Turn policy, memória e intent routing
+
+- `turn_policy.py`: objetivo por stage, limite de perguntas, trim WhatsApp, handoff por 2+ objeções
+- Contexto de lead anti-repetição (BANT conhecido vs faltante + objeções)
+- Skills condicionais por message_count / stage / tier
+- Intent guia agente e stage no LangGraph (`ready_to_buy` → closer/qualified)
+- System prompt recebe agent + history (turn policy + skills corretos)
+
 ## 2.4.0 — 2026-08-04
 
 ### P0 — LangGraph wire (elite + trust)
