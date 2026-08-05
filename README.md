@@ -32,6 +32,7 @@ Cada cliente é um **workspace** isolado no Supabase, com **playbook** próprio
 | Integrações | Composio (Calendar, LinkedIn…) |
 | Jobs | Follow-up + sync Twenty |
 | Painel | FastAPI admin + console React |
+| Dashboard cliente | Next.js 14 em `dashboard/` |
 
 ## Quickstart
 
@@ -69,6 +70,32 @@ make admin         # http://localhost:8100
 
 KPIs, funil de pipeline, leads, eventos, playbook e criação de workspace. Veja [docs/ADMIN.md](docs/ADMIN.md).
 
+## Dashboard cliente (Vercel)
+
+O Painel Cliente (Next.js) vive em **`dashboard/`**.
+
+Na Vercel (Settings → General):
+
+| Campo | Valor |
+|--------|--------|
+| **Framework Preset** | Next.js |
+| **Root Directory** | `dashboard` |
+| **Install Command** | `npm ci` |
+| **Build Command** | `npm run build` |
+| **Output Directory** | *(vazio — gerenciado pelo Next.js)* |
+| **Node.js Version** | 20.x |
+
+```bash
+cd dashboard
+npm ci
+npm run build   # deve finalizar com sucesso
+npm run dev
+```
+
+**Importante:** não use a raiz do repositório como Root Directory. Não há `package.json` de frontend na raiz (monorepo Python + `dashboard/` + `web/`). Deploys com Root Directory `/` falham em 1–2 segundos.
+
+Detalhes: [dashboard/README.md](dashboard/README.md).
+
 ## Deploy 24/7
 
 ```bash
@@ -103,14 +130,8 @@ CI roda `ruff` + `pytest` em Python 3.11 e 3.12 a cada push/PR.
 ```
 CODEBASE.md        mapa vivo do repositório (comece por aqui)
 agents/            agentes, webhook, painel admin, jobs e testes
-  playbook.py      especialização por workspace (P1)
-  lead_score.py    score + hot leads (P2)
-  intent.py        ready_to_buy vs researching (P2)
-  enrichment.py    enrich pré-mensagem (P2)
-  closer_tools.py  Calendar + proposta (P2)
-  integrations/    Composio
-  tests/           pytest
-web/               console React (leads, playbook, notes, pause)
+dashboard/         Painel Cliente Next.js (deploy Vercel → Root Directory: dashboard)
+web/               console React legado (Vite)
 config/prompts/    prompts editáveis (sdr / closer / followup)
 supabase/          schema + migrations
 docker/            init do Postgres da Evolution
@@ -137,8 +158,7 @@ docs/              documentação temática
 - [x] Camada de integrações Fase 0+1 (Composio session/authorize/API)
 - [x] Playbook por workspace (ICP, pricing, cases, tom → system prompt)
 - [x] Módulos elite: score, intent, enrichment, closer tools + API
-- [ ] Wire LangGraph (enrich/intent/score/calendar automáticos no fluxo WhatsApp)
-- [ ] UI hot-leads + badges de score/intent
+- [x] Dashboard cliente Next.js (`dashboard/`)
 - [ ] Billing por plano (Asaas/Stripe)
 - [ ] Testes E2E com mensagem real
 
