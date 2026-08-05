@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { login } from "@/lib/auth/login";
 import type { AuthError } from "@/types/auth";
 import { AuthAlert } from "./auth-alert";
@@ -12,8 +11,8 @@ import { AuthFooter } from "./auth-footer";
 import { PasswordInput } from "./password-input";
 import { cn } from "@/lib/utils";
 
-const inputClass =
-  "h-11 w-full rounded-xl border border-border bg-white px-3.5 text-sm text-ink placeholder:text-ink-soft shadow-card transition focus:border-brand focus:outline-none focus:shadow-focus disabled:cursor-not-allowed disabled:opacity-60";
+const fieldClass =
+  "h-9 w-full rounded-md border border-border bg-surface px-3 text-[13px] text-ink placeholder:text-ink-soft transition-ui focus:border-brand focus:outline-none focus:shadow-focus disabled:cursor-not-allowed disabled:opacity-50";
 
 export function LoginForm() {
   const router = useRouter();
@@ -79,25 +78,32 @@ export function LoginForm() {
   };
 
   return (
-    <div className="rounded-2xl border border-border bg-surface-card p-6 shadow-card sm:p-8">
+    <div>
+      <div className="mb-8 flex items-center gap-2.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-brand text-white">
+          <span className="text-xs font-bold tracking-tight">F</span>
+        </div>
+        <span className="text-[15px] font-semibold tracking-tight text-ink">
+          ForceIA
+        </span>
+      </div>
+
       <div className="mb-6">
-        <h1 className="font-display text-xl font-semibold tracking-tight text-ink">
+        <h1 className="text-lg font-medium tracking-tight text-ink">
           Bem-vindo de volta
         </h1>
-        <p className="mt-1.5 text-[13px] text-ink-muted">
-          Acesse o Painel Cliente da ForceIA.
+        <p className="mt-1 text-[13px] text-ink-muted">
+          Acesse o Painel Cliente
         </p>
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
-        {error && (
-          <AuthAlert variant="error">{error.message}</AuthAlert>
-        )}
+        {error && <AuthAlert variant="error">{error.message}</AuthAlert>}
 
         <div>
           <label
             htmlFor="email"
-            className="mb-1.5 block text-[13px] font-medium text-ink"
+            className="mb-1.5 block text-[12px] font-medium text-ink-muted"
           >
             E-mail
           </label>
@@ -105,7 +111,6 @@ export function LoginForm() {
             id="email"
             name="email"
             type="email"
-            inputMode="email"
             autoComplete="email"
             value={email}
             onChange={(e) => {
@@ -113,38 +118,34 @@ export function LoginForm() {
               if (fieldErrors.email)
                 setFieldErrors((f) => ({ ...f, email: undefined }));
             }}
-            placeholder="voce@empresa.com"
+            placeholder="seu@email.com"
             disabled={loading}
             aria-invalid={!!fieldErrors.email}
             aria-describedby={fieldErrors.email ? "email-error" : undefined}
             className={cn(
-              inputClass,
+              fieldClass,
               fieldErrors.email &&
-                "border-alert focus:border-alert focus:shadow-[0_0_0_3px_rgba(221,101,57,0.2)]"
+                "border-warning focus:border-warning focus:shadow-[0_0_0_2px_rgba(221,101,57,0.25)]",
             )}
           />
           {fieldErrors.email && (
-            <p
-              id="email-error"
-              className="mt-1.5 text-[12px] text-alert"
-              role="alert"
-            >
+            <p id="email-error" className="mt-1.5 text-[12px] text-warning">
               {fieldErrors.email}
             </p>
           )}
         </div>
 
         <div>
-          <div className="mb-1.5 flex items-center justify-between gap-2">
+          <div className="mb-1.5 flex items-center justify-between">
             <label
               htmlFor="password"
-              className="block text-[13px] font-medium text-ink"
+              className="block text-[12px] font-medium text-ink-muted"
             >
               Senha
             </label>
             <Link
               href="/esqueci-minha-senha"
-              className="text-[12px] font-medium text-brand transition hover:underline"
+              className="text-[12px] text-brand transition-ui hover:opacity-80"
             >
               Esqueci minha senha
             </Link>
@@ -165,50 +166,45 @@ export function LoginForm() {
             }
           />
           {fieldErrors.password && (
-            <p
-              id="password-error"
-              className="mt-1.5 text-[12px] text-alert"
-              role="alert"
-            >
+            <p id="password-error" className="mt-1.5 text-[12px] text-warning">
               {fieldErrors.password}
             </p>
           )}
         </div>
 
-        <label className="flex cursor-pointer items-center gap-2.5 select-none">
+        <label className="flex items-center gap-2 pt-0.5">
           <input
             type="checkbox"
             checked={remember}
             onChange={(e) => setRemember(e.target.checked)}
             disabled={loading}
-            className="h-4 w-4 rounded border-border text-brand accent-brand focus:ring-brand focus:ring-offset-0"
+            className="h-3.5 w-3.5 rounded border-border bg-surface text-brand focus:ring-0 focus:ring-offset-0"
           />
-          <span className="text-[13px] text-ink-muted">Manter conectado</span>
+          <span className="text-[12px] text-ink-muted">Manter conectado</span>
         </label>
 
-        <Button
+        <button
           type="submit"
-          variant="primary"
-          size="lg"
           disabled={loading}
-          className="w-full"
+          className={cn(
+            "mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-md text-[13px] font-medium transition-ui",
+            "bg-ink text-background hover:opacity-90",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            "focus-visible:outline-none focus-visible:shadow-focus",
+          )}
         >
           {loading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
               Entrando…
             </>
           ) : (
             "Entrar"
           )}
-        </Button>
+        </button>
       </form>
 
-      <p className="mt-5 text-center text-[12px] leading-relaxed text-ink-soft">
-        Seu acesso é criado pela equipe ForceIA durante a implantação.
-      </p>
-
-      <div className="mt-4 border-t border-border-soft pt-4">
+      <div className="mt-8">
         <AuthFooter />
       </div>
     </div>
