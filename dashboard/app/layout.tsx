@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ForceIA \u00b7 Dashboard",
+  title: "ForceIA · Operations",
   description:
-    "Acompanhe sua equipe de vendas com IA em tempo real \u2014 leads, qualifica\u00e7\u00f5es, reuni\u00f5es e pipeline.",
+    "Sistema operacional da sua equipe comercial com IA — pipeline, conversas, reuniões e resultados em tempo real.",
 };
 
 export default function RootLayout({
@@ -13,8 +13,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
-      <body className="font-sans antialiased">{children}</body>
+    <html lang="pt-BR" className="dark">
+      <body className="font-sans antialiased bg-background text-ink">{children}</body>
     </html>
   );
 }
