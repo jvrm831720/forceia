@@ -1,4 +1,9 @@
-export type ConversationChannel = "whatsapp" | "web" | "instagram";
+export type ConversationFilter =
+  | "all"
+  | "ai"
+  | "attention"
+  | "human"
+  | "closed";
 
 export type AgentRole = "sdr" | "closer" | "followup" | "human";
 
@@ -6,90 +11,89 @@ export type ConversationStatus =
   | "ai_handling"
   | "needs_attention"
   | "human"
-  | "finished";
+  | "closed";
 
 export type MessageSender = "lead" | "ai" | "human" | "system";
 
-export type ConversationFilter =
-  | "all"
-  | "ai_handling"
-  | "needs_attention"
-  | "human"
-  | "finished";
+export type Channel = "whatsapp" | "email" | "webchat";
 
 export type Temperature = "hot" | "warm" | "cold";
-
-export interface ConversationParticipant {
-  id: string;
-  name: string;
-  company: string;
-  phone?: string;
-  email?: string;
-  avatarUrl?: string;
-  initials: string;
-}
 
 export interface ConversationMessage {
   id: string;
   sender: MessageSender;
-  agentRole?: Exclude<AgentRole, "human">;
   content: string;
-  createdAt: string;
+  timestamp: string;
   status?: "sent" | "delivered" | "read";
+  agentRole?: AgentRole;
+  systemKind?:
+    | "assumed"
+    | "returned"
+    | "stage_change"
+    | "meeting"
+    | "note";
 }
 
-export interface ConversationTimelineEvent {
+export interface HandoffRequest {
   id: string;
-  label: string;
-  at: string;
+  reason: string;
+  requestedAt: string;
+  dismissed?: boolean;
 }
 
-export interface ConversationMeeting {
+export interface MeetingInfo {
   date: string;
   time: string;
   link?: string;
+  title?: string;
+}
+
+export interface TimelineEvent {
+  id: string;
+  label: string;
+  timestamp: string;
+  done: boolean;
 }
 
 export interface ConversationOpportunity {
-  origin: string;
+  leadName: string;
+  company: string;
+  phone?: string;
+  email?: string;
+  source?: string;
   temperature: Temperature;
   pipelineStage: string;
+  currentOwner: AgentRole;
   aiSummary: string;
   nextAction: string;
-  lastActivityAt: string;
-  meeting?: ConversationMeeting;
-  timeline: ConversationTimelineEvent[];
-}
-
-export interface ConversationHandoff {
-  requested: boolean;
-  reason: string;
-  requestedAt: string;
+  lastActivity: string;
+  meeting?: MeetingInfo;
+  timeline: TimelineEvent[];
 }
 
 export interface Conversation {
   id: string;
-  participant: ConversationParticipant;
-  channel: ConversationChannel;
-  status: ConversationStatus;
-  responsible: AgentRole;
-  lastMessagePreview: string;
+  leadName: string;
+  company: string;
+  avatarInitials: string;
+  lastMessage: string;
   lastMessageAt: string;
-  unreadCount: number;
+  channel: Channel;
+  status: ConversationStatus;
+  currentOwner: AgentRole;
+  unreadCount?: number;
   messages: ConversationMessage[];
   opportunity: ConversationOpportunity;
-  handoff?: ConversationHandoff;
-  typing?: "lead" | "ai" | null;
-}
-
-export interface ConversationsWorkspace {
-  companyName: string;
-  userName: string;
-  userInitials: string;
+  handoff?: HandoffRequest;
+  isTyping?: "lead" | "ai" | null;
 }
 
 export interface ConversationsData {
-  workspace: ConversationsWorkspace;
+  workspace: {
+    companyName: string;
+    userName: string;
+    userInitials: string;
+  };
   conversations: Conversation[];
   notificationsCount?: number;
 }
