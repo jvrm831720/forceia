@@ -2,7 +2,7 @@
 ForceIA - Camada de inteligencia dos agentes.
 
 - Extrai BANT, nome, empresa, email e intencao a partir da conversa
-- Monta contexto rico para o system prompt (lead + playbook + guardrails + skills)
+- Monta contexto rico para o system prompt (lead + playbook + guardrails + skills + turn policy)
 - Parseia bloco ---META--- (JSON) retornado pelo LLM
 - Calcula score de qualificacao
 """
@@ -147,6 +147,9 @@ def extract_contact_hints(text: str) -> dict[str, str]:
 
 
 def build_lead_context(lead: dict, workspace_name: str = "ForceIA") -> str:
+    """Contexto anti-repetição: deixa explícito o que já se sabe e o que falta."""
+    from turn_policy import known_bant_summary, missing_bant_fields
+
     bant = lead.get("bant") or {}
     meta = lead.get("metadata") or {}
     lines = [
@@ -159,22 +162,43 @@ def build_lead_context(lead: dict, workspace_name: str = "ForceIA") -> str:
         lines.append(f"Empresa: {lead['company']}.")
     if lead.get("email"):
         lines.append(f"Email: {lead['email']}.")
-    if bant:
-        lines.append("BANT conhecido ate agora:")
-        for k in ("need", "authority", "budget", "timeline"):
-            if bant.get(k):
-                lines.append(f"  - {k}: {bant[k]}")
-        score = bant_score(bant)
-        lines.append(f"  - score: {score}/100")
-    notes = meta.get("notes") or meta.get("last_intent")
+
+    known = known_bant_summary(bant)
+    missing = missing_bant_fields(bant)
+    if known:
+        lines.append("BANT já conhecido (NÃO pergunte de novo):")
+        for item in known:
+            lines.append(f"  - {item}")
+        lines.append(f"  - score: {bant_score(bant)}/100")
+    if missing:
+        lines.append("BANT ainda faltando (avance só no próximo campo): " + ", ".join(missing))
+    elif known:
+        lines.append("BANT completo o suficiente — não reabra discovery.")
+
+    intent = meta.get("buying_intent") or meta.get("last_intent")
+    if intent:
+        lines.append(f"Intent atual: {intent}.")
+    tier = meta.get("lead_tier")
+    score = meta.get("lead_score")
+    if tier or score is not None:
+        lines.append(f"Lead score/tier: {score if score is not None else '—'}/{tier or '—'}.")
+
+    notes = meta.get("notes")
     if notes:
         lines.append(f"Notas internas: {notes}")
+
     objections = meta.get("objections")
     if objections:
-        lines.append(f"Objecoes ja levantadas: {objections}")
+        if isinstance(objections, str):
+            objections = [objections]
+        lines.append(
+            "Objeções já levantadas (use resposta aprovada do playbook; não reinvente): "
+            + "; ".join(str(o) for o in objections[-5:])
+        )
+
     lines.append(
-        "Use essas informacoes: nao pergunte de novo o que ja sabe. "
-        "Avance a conversa com base no que falta no BANT."
+        "Regra de memória: não pergunte de novo o que já está acima. "
+        "Avance só o que falta no BANT ou trate a objeção ativa."
     )
     return "\n".join(lines)
 
@@ -208,6 +232,7 @@ def apply_meta_to_lead_fields(lead: dict, meta: dict, user_text: str) -> dict[st
         if obj not in prev:
             prev = list(prev) + [obj]
         meta_store["objections"] = prev[-5:]
+        meta_store["objection_streak"] = int(meta_store.get("objection_streak") or 0) + 1
     if meta.get("notes"):
         meta_store["notes"] = meta["notes"]
     if meta.get("handoff"):
@@ -227,19 +252,30 @@ def build_system_prompt(
 ) -> str:
     from guardrails import format_guardrails_for_prompt
     from playbook import format_playbook_for_prompt
+    from state_machine import next_agent_for_stage
+    from turn_policy import format_turn_policy_for_prompt
+
+    stage = (lead.get("stage") or "sdr").lower()
+    agent_name = (agent or next_agent_for_stage(stage) or "sdr").lower()
+    meta = lead.get("metadata") or {}
+    intent = meta.get("buying_intent") or meta.get("last_intent")
+    message_count = len(messages or [])
 
     context = build_lead_context(lead, workspace_name=workspace_name)
     playbook_block = format_playbook_for_prompt(playbook)
     guardrails_block = format_guardrails_for_prompt(playbook)
+    turn_block = format_turn_policy_for_prompt(
+        stage=stage,
+        agent=agent_name,
+        lead=lead,
+        intent=intent,
+        message_count=message_count,
+    )
 
-    # Skills de elite (ICP, personalização, pré-call, revival, pipeline)
     skills_block = ""
     try:
         from skills import build_skills_context
-        from state_machine import next_agent_for_stage
 
-        stage = (lead.get("stage") or "sdr").lower()
-        agent_name = (agent or next_agent_for_stage(stage) or "sdr").lower()
         skills_block = build_skills_context(
             lead=lead,
             playbook=playbook,
@@ -249,7 +285,6 @@ def build_system_prompt(
     except Exception:
         skills_block = ""
 
-    # Enrichment legado (se existir)
     enrichment_block = ""
     try:
         from enrichment import format_enrichment_for_prompt
@@ -270,7 +305,7 @@ Regras do META:
 - Preencha so o que descobriu nesta conversa (nao invente).
 - stage: so mude quando fizer sentido (ex.: BANT suficiente → "qualified"; fechou → "won").
 - score: 0-100 estimado de qualificacao.
-- handoff: true se o lead pedir humano ou o caso for sensivel demais para IA.
+- handoff: true se o lead pedir humano, caso sensivel, ou 2+ objecoes sem resolucao.
 - O lead NAO deve ver o bloco ---META--- (ele e removido automaticamente).
 - Mensagem ao lead: curta, WhatsApp, portugues brasileiro.
 """.strip()
@@ -279,6 +314,7 @@ Regras do META:
     if playbook_block:
         parts.append(playbook_block)
     parts.append(guardrails_block)
+    parts.append(turn_block)
     if enrichment_block:
         parts.append(enrichment_block)
     if skills_block:

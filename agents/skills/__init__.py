@@ -2,8 +2,7 @@
 ForceIA Skills de elite — inspiradas em playbooks de prospecting de alto nível
 (Amplemarket-style), adaptadas ao stack ForceIA (playbook, enrichment, WhatsApp).
 
-Não dependem de Amplemarket MCP. Usam playbook do workspace + enrichment +
-mensagens + score nativo.
+P1: skills condicionais por stage / message_count / tier para evitar prompt bloat.
 """
 
 from __future__ import annotations
@@ -63,6 +62,21 @@ def list_skills() -> list[dict]:
     return list(SKILL_CATALOG)
 
 
+def _message_count(lead: dict, messages: list[dict] | None) -> int:
+    if messages is not None:
+        return len(messages)
+    meta = lead.get("metadata") or {}
+    try:
+        return int(meta.get("message_count") or meta.get("msg_count") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _tier(lead: dict) -> str:
+    meta = lead.get("metadata") or {}
+    return str(meta.get("lead_tier") or "").lower()
+
+
 def build_skills_context(
     *,
     lead: dict,
@@ -70,37 +84,49 @@ def build_skills_context(
     agent: str = "sdr",
     messages: list[dict] | None = None,
 ) -> str:
-    """Bloco único injetado no system prompt conforme o agente/stage."""
+    """Bloco único injetado no system prompt conforme agente/stage/contagem (P1)."""
     parts: list[str] = []
     stage = (lead.get("stage") or "sdr").lower()
+    agent = (agent or "sdr").lower()
+    msg_n = _message_count(lead, messages)
+    tier = _tier(lead)
+    early = msg_n <= 4
 
-    icp = format_icp_for_prompt(lead, playbook)
-    if icp:
-        parts.append(icp)
+    # ICP: sempre no início; depois só se tier não for hot (reavaliar fit)
+    if early or tier in ("", "cold", "warm"):
+        icp = format_icp_for_prompt(lead, playbook)
+        if icp:
+            parts.append(icp)
 
-    # Hiring signal tem prioridade alta na abertura do SDR
-    hiring = format_hiring_signal_for_prompt(lead, playbook)
-    if hiring:
-        parts.append(hiring)
+    # Hiring signal: prioridade na abertura SDR
+    if agent == "sdr" and stage in ("sdr", "qualified") and early:
+        hiring = format_hiring_signal_for_prompt(lead, playbook)
+        if hiring:
+            parts.append(hiring)
 
-    if agent == "sdr" or stage in ("sdr", "qualified"):
+    # Personalization: primeiras mensagens SDR/qualified
+    if (agent == "sdr" or stage in ("sdr", "qualified")) and msg_n <= 6:
         pers = format_personalization_for_prompt(lead, playbook)
         if pers:
             parts.append(pers)
 
+    # Pre-call: só closer / qualified avançado
     if agent == "closer" or stage in ("closer", "qualified"):
         brief = format_pre_call_for_prompt(lead, playbook, messages=messages)
         if brief:
             parts.append(brief)
 
+    # Revival: followup / lost
     if agent == "followup" or stage in ("followup", "lost"):
         rev = format_revival_for_prompt(lead, playbook)
         if rev:
             parts.append(rev)
 
-    health = format_pipeline_for_prompt(lead)
-    if health:
-        parts.append(health)
+    # Pipeline health: se não está hot, ou followup, ou msg_n alta
+    if tier != "hot" or stage in ("followup", "lost") or msg_n >= 8:
+        health = format_pipeline_for_prompt(lead)
+        if health:
+            parts.append(health)
 
     return "\n\n".join(parts) if parts else ""
 

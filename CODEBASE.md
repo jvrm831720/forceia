@@ -1,6 +1,6 @@
 # ForceIA — Codebase Map
 
-> Última revisão: **2026-08-04** · Versão: **2.4.0 (P0 LangGraph wire)**
+> Última revisão: **2026-08-04** · Versão: **2.5.0 (P1 turn policy + intent routing)**
 
 Objetivo: melhor SDR / Closer / Follow-up **por lead**, com playbook, inteligência, produto, confiança e **skills de prospecting de elite**.
 
@@ -11,55 +11,53 @@ Objetivo: melhor SDR / Closer / Follow-up **por lead**, com playbook, inteligên
 | P | Tema | Status |
 |---|------|--------|
 | 1 | Playbook | ✅ |
-| 2 | Elite (score/intent/enrich/calendar) | ✅ **wired no LangGraph (P0)** |
+| 2 | Elite (score/intent/enrich/calendar) | ✅ wired LangGraph (P0) |
 | 3 | Product UX | ✅ |
-| 4 | Trust (guardrails, A/B, handoff) | ✅ **wired no LangGraph (P0)** |
-| **Skills** | ICP fit, personalization, pre-call, revival, pipeline | ✅ |
+| 4 | Trust (guardrails, A/B, handoff) | ✅ wired LangGraph (P0) |
+| **P1** | Turn policy · memória BANT · skills condicionais · intent→rota | ✅ |
+| **Skills** | ICP, personalization, pre-call, revival, pipeline | ✅ condicionais |
 
-### P0 — LangGraph (2026-08-04)
+### P1 — 2026-08-04
 
-No `agents/graph.py`, cada turno agora:
+- `agents/turn_policy.py` — objetivos por stage, max 1 `?`, trim WhatsApp, objection streak
+- `intelligence.build_lead_context` — “já sabemos / ainda falta” (anti-repetição)
+- `intelligence.build_system_prompt` — bloco de política de turno + intent guidance
+- `skills.build_skills_context` — thresholds por `message_count` / stage / tier
+- `graph` — intent→agente/stage, `enforce_turn_policy` no parse, handoff por 2+ objeções
+- `run_sdr` — passa `agent` + `history` ao system prompt
 
-1. **prepare** — enrichment (`enrich_lead`), variante A/B, intent lexical, `compute_lead_score`
-2. **generate** — prompt A/B (`resolve_prompt_for_variant`) + `record_ab_exposure`
-3. **parse** — `enforce_guardrails`, intent refinado (META+lexical), score no metadata, auto-qualify por BANT/score/intent
-4. **actions** — `run_agent_actions` + `execute_closer_actions` (calendar/proposta); flag `wants_meeting` se `ready_to_buy`
-5. **persist** — `execute_handoff` completo (pause + notify humano) + persiste score/intent
+### P0 — LangGraph wire
+
+prepare → enrichment, A/B, intent, score · generate → A/B prompt · parse → guardrails · actions → closer_tools · persist → execute_handoff
 
 ---
 
 ## Skills (`agents/skills/`)
 
-Injetadas no **system prompt** via `intelligence.build_system_prompt`:
+Injetadas sob condição (P1):
 
-- `icp_fit` — score 1–100 + grade
-- `personalization` — openers SDR
-- `pre_call` — brief Closer
-- `revival` — reativação lost
-- `pipeline_health` — Hot/Warm/Cold/At Risk
-
-API: `GET /api/skills` · `GET /api/workspaces/{slug}/leads/{id}/skills`
-
-Docs: `docs/SKILLS.md`
+- `icp_fit` — early ou tier ≠ hot
+- `hiring_signal` / `personalization` — abertura SDR
+- `pre_call` — closer / qualified
+- `revival` — followup / lost
+- `pipeline_health` — se não hot ou conversa longa
 
 ---
 
 ## Stack
 
-WhatsApp (Evolution) → LangGraph (P0 wired) → playbook + guardrails + **skills** + META → Supabase
-
-Painel: FastAPI `:8100` + React `web/`
+WhatsApp (Evolution) → LangGraph (P0+P1) → playbook + guardrails + turn policy + skills + META → Supabase
 
 ---
 
 ## Roadmap aberto
 
-- [x] Wire LangGraph completo (P2 elite + guardrails + A/B + handoff)
+- [x] Wire LangGraph P0
+- [x] P1 turn policy / intent routing / skills condicionais
 - UI badges ICP/health no console
 - List building em massa (Composio/Twenty)
 - Billing · E2E
-- Política de turnos por stage (P1)
-- Skills condicionais por message_count (P1)
+- Tools formais no closer (bind_tools)
 
 ---
 
