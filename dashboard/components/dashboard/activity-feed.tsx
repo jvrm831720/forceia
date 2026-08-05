@@ -1,37 +1,54 @@
 import type { ActivityItem, ActivityKind } from "@/types/dashboard";
-import { ArrowRightLeft, Calendar, MessageCircle, RefreshCw, TrendingUp, UserCheck } from "lucide-react";
 
-const KIND: Record<ActivityKind, { icon: typeof UserCheck; color: string }> = {
-  qualified: { icon: UserCheck, color: "text-success" },
-  meeting: { icon: Calendar, color: "text-brand" },
-  followup: { icon: RefreshCw, color: "text-ai" },
-  handoff: { icon: ArrowRightLeft, color: "text-warning" },
-  reply: { icon: MessageCircle, color: "text-ink-muted" },
-  pipeline: { icon: TrendingUp, color: "text-success" },
+const KIND_LABEL: Record<ActivityKind, string> = {
+  qualified: "QUAL",
+  meeting: "MTG",
+  followup: "FUP",
+  handoff: "HO",
+  reply: "MSG",
+  pipeline: "PIPE",
+};
+
+const KIND_COLOR: Record<ActivityKind, string> = {
+  qualified: "text-success",
+  meeting: "text-brand",
+  followup: "text-ai",
+  handoff: "text-warning",
+  reply: "text-ink-muted",
+  pipeline: "text-success",
 };
 
 export function ActivityFeed({ items }: { items: ActivityItem[] }) {
   return (
-    <section className="rounded-lg border border-border bg-surface">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="font-display text-sm font-semibold tracking-tight text-ink">Atividade ao vivo</h2>
-        <span className="text-label">Tempo real</span>
+    <section className="border border-border bg-canvas">
+      <div className="flex items-center justify-between border-b border-border px-3 py-2">
+        <h2 className="text-[13px] font-medium text-ink">Atividade</h2>
+        <span className="text-label">Live</span>
       </div>
       <ul className="divide-y divide-border">
-        {items.map((item) => {
-          const meta = KIND[item.kind] ?? KIND.reply;
-          const Icon = meta.icon;
-          return (
-            <li key={item.id} className="flex gap-3 px-4 py-3 transition-ui hover:bg-surface-hover">
-              <div className={`mt-0.5 shrink-0 ${meta.color}`}><Icon className="h-4 w-4" strokeWidth={1.75} /></div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-ink">{item.title}</p>
-                {item.description && <p className="mt-0.5 text-xs text-ink-muted line-clamp-2">{item.description}</p>}
-              </div>
-              <time className="shrink-0 text-[11px] tabular-nums text-ink-soft">{item.time}</time>
-            </li>
-          );
-        })}
+        {items.map((item) => (
+          <li
+            key={item.id}
+            className="flex items-start gap-2.5 px-3 py-2 transition-ui hover:bg-surface"
+          >
+            <span
+              className={`mt-0.5 w-9 shrink-0 font-mono text-[10px] font-medium ${KIND_COLOR[item.kind] ?? "text-ink-muted"}`}
+            >
+              {KIND_LABEL[item.kind] ?? "EVT"}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] text-ink">{item.title}</p>
+              {item.description && (
+                <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-soft">
+                  {item.description}
+                </p>
+              )}
+            </div>
+            <time className="shrink-0 font-mono text-[10px] tabular-nums text-ink-soft">
+              {item.time}
+            </time>
+          </li>
+        ))}
       </ul>
     </section>
   );
