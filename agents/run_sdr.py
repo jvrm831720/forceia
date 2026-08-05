@@ -1,6 +1,6 @@
 """
 ForceIA - Runtime multi-tenant dos agentes
-(inteligencia + BANT + META + playbook + guardrails + A/B + handoff).
+(inteligencia + BANT + META + playbook + guardrails + A/B + handoff + turn policy P1).
 """
 
 from __future__ import annotations
@@ -85,6 +85,8 @@ def build_messages(
         lead,
         workspace_name=workspace_name,
         playbook=playbook,
+        agent=agent,
+        messages=history,
     )
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
     for h in history:
@@ -250,6 +252,7 @@ def _handle_incoming_legacy(
 ) -> str:
     from ab_testing import ensure_lead_variant, record_ab_exposure, resolve_prompt_for_variant
     from guardrails import enforce_guardrails
+    from turn_policy import enforce_turn_policy
 
     ws = workspace
     lead = get_lead_by_phone(ws.id, number)
@@ -259,7 +262,6 @@ def _handle_incoming_legacy(
         log.info("lead criado", extra={"workspace": ws.slug, "phone": number})
         sync_twenty(ws, lead)
 
-    # A/B variant estável por lead
     ab_meta, ab_variant = ensure_lead_variant(lead, ws.id)
     if ab_meta.get("ab_variant") != (lead.get("metadata") or {}).get("ab_variant"):
         merge_metadata(ws.id, number, {"ab_variant": ab_variant})
@@ -311,7 +313,6 @@ def _handle_incoming_legacy(
     visible, meta = split_reply_and_meta(raw_reply)
     reply = strip_control_blocks(visible)
 
-    # Guardrails pós-resposta
     playbook = extract_playbook_from_workspace(ws.raw)
     guarded = enforce_guardrails(reply, playbook=playbook, strict=True)
     if guarded.get("modified"):
@@ -323,6 +324,16 @@ def _handle_incoming_legacy(
                 "has_price_risk": guarded.get("has_price_risk"),
                 "has_deadline_risk": guarded.get("has_deadline_risk"),
             },
+            lead_id=lead["id"],
+            workspace_id=ws.id,
+        )
+
+    policy = enforce_turn_policy(reply, stage=stage, agent=agent)
+    if policy.get("modified"):
+        reply = policy["reply"]
+        log_event(
+            "turn_policy_enforced",
+            {"issues": policy.get("issues"), "open_questions": policy.get("open_questions")},
             lead_id=lead["id"],
             workspace_id=ws.id,
         )
@@ -347,7 +358,6 @@ def _handle_incoming_legacy(
         try:
             from handoff import execute_handoff
 
-            # atualiza lead em memória com fields já parseados
             lead_for_handoff = dict(lead)
             if field_updates.get("bant"):
                 lead_for_handoff["bant"] = field_updates["bant"]
