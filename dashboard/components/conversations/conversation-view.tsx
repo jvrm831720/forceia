@@ -97,10 +97,10 @@ export function ConversationView({
           })}
 
           {conversation.isTyping === "ai" && (
-            <TypingIndicator label="IA digitando" variant="ai" />
+            <TypingIndicator label="IA digitando" align="right" />
           )}
           {conversation.isTyping === "lead" && (
-            <TypingIndicator label="Cliente digitando" variant="lead" />
+            <TypingIndicator label="Cliente digitando" align="left" />
           )}
 
           <div ref={bottomRef} />
