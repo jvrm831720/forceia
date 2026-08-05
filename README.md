@@ -80,14 +80,14 @@ Na Vercel (Settings → General):
 |--------|--------|
 | **Framework Preset** | Next.js |
 | **Root Directory** | `dashboard` |
-| **Install Command** | `npm ci` |
+| **Install Command** | `npm install` |
 | **Build Command** | `npm run build` |
 | **Output Directory** | *(vazio — gerenciado pelo Next.js)* |
 | **Node.js Version** | 20.x |
 
 ```bash
 cd dashboard
-npm ci
+npm install
 npm run build   # deve finalizar com sucesso
 npm run dev
 ```
