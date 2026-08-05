@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.6.0 — 2026-08-04
+
+### P2 — Console badges, bulk list building, closer tool registry
+
+- `lead_badges.py`: badges score/ICP/health/intent + `summarize_workspace_intelligence`
+- `list_builder.py`: import em massa com normalização BR e sync Twenty opcional
+- `tools/closer_registry.py`: registry formal (schedule / proposal / handoff) executado a partir do META
+- `p2_routes.py` montado no admin: leads-enriched, metrics-intel, bulk, tools
+- Console: tabela com badges, chips Hot/At-risk/Ready, UI de bulk import (JSON/CSV)
+- Graph: `_node_actions` usa registry (fallback para `closer_tools` P0)
+- Mount de elite/skills/product/trust routes no `admin_server`
+
 ## 2.5.0 — 2026-08-04
 
 ### P1 — Turn policy, memória e intent routing
