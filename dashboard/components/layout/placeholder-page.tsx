@@ -1,35 +1,21 @@
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Card } from "@/components/ui/card";
+import { getDashboardData } from "@/lib/dashboard-data";
 
-export function PlaceholderPage({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
+interface PlaceholderPageProps { title: string; description: string; }
+
+export async function PlaceholderPage({ title, description }: PlaceholderPageProps) {
+  const data = await getDashboardData();
   return (
-    <div className="flex min-h-screen bg-surface">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header
-          workspace={{
-            companyName: "Clínica Sol",
-            userName: "João",
-            userInitials: "JS",
-          }}
-        />
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl">
-            <Card className="p-10 text-center">
-              <h1 className="font-display text-2xl font-semibold text-ink">
-                {title}
-              </h1>
-              <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-muted">
-                {description}
-              </p>
-            </Card>
+        <Header workspace={data.workspace} notificationsCount={data.notificationsCount} />
+        <main className="flex flex-1 items-center justify-center px-4 py-16">
+          <div className="max-w-md text-center">
+            <p className="text-label mb-3">Em breve</p>
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">{title}</h1>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">{description}</p>
           </div>
         </main>
       </div>
