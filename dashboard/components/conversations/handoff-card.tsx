@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import type { ConversationHandoff } from "@/types/conversation";
+import type { HandoffRequest } from "@/types/conversation";
 import { AlertTriangle } from "lucide-react";
 
 export function HandoffCard({
@@ -9,12 +9,10 @@ export function HandoffCard({
   onAssume,
   onDismiss,
 }: {
-  handoff: ConversationHandoff;
+  handoff: HandoffRequest;
   onAssume: () => void;
   onDismiss: () => void;
 }) {
-  if (!handoff.requested) return null;
-
   return (
     <div
       className="mx-4 mt-3 rounded-2xl border border-alert/25 bg-alert-soft p-4 shadow-card"
@@ -27,7 +25,7 @@ export function HandoffCard({
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-display text-sm font-semibold text-ink">
-            A IA solicitou sua interven\u00e7\u00e3o
+            A IA solicitou sua intervenção
           </p>
           <p className="mt-1 text-sm text-ink-muted">
             <span className="font-medium text-ink">Motivo:</span> {handoff.reason}
