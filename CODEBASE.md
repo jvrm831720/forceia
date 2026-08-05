@@ -1,6 +1,6 @@
 # ForceIA — Codebase Map
 
-> Última revisão: **2026-08-04** · Versão: **2.5.0 (P1 turn policy + intent routing)**
+> Última revisão: **2026-08-04** · Versão: **2.6.0 (P2 console badges · bulk · closer registry)**
 
 Objetivo: melhor SDR / Closer / Follow-up **por lead**, com playbook, inteligência, produto, confiança e **skills de prospecting de elite**.
 
@@ -15,16 +15,24 @@ Objetivo: melhor SDR / Closer / Follow-up **por lead**, com playbook, inteligên
 | 3 | Product UX | ✅ |
 | 4 | Trust (guardrails, A/B, handoff) | ✅ wired LangGraph (P0) |
 | **P1** | Turn policy · memória BANT · skills condicionais · intent→rota | ✅ |
+| **P2** | Console badges · bulk list building · closer tool registry | ✅ |
 | **Skills** | ICP, personalization, pre-call, revival, pipeline | ✅ condicionais |
+
+### P2 — 2026-08-04
+
+- `lead_badges.py` — score / ICP / health / intent por lead (+ agregados de workspace)
+- `list_builder.py` — import em massa (normalize phone BR, upsert, optional Twenty)
+- `tools/closer_registry.py` — tools formais (`schedule_meeting`, `send_proposal`, `request_handoff`) via META
+- `p2_routes.py` — `/leads-enriched`, `/metrics-intel`, `/leads/bulk`, `/tools/closer`, execute tool
+- Admin console — colunas de badges + chips intel + UI de bulk import
+- Graph overlay — `_node_actions` prefere `closer_registry` (fallback P0)
 
 ### P1 — 2026-08-04
 
-- `agents/turn_policy.py` — objetivos por stage, max 1 `?`, trim WhatsApp, objection streak
+- `turn_policy.py` — objetivos por stage, max 1 `?`, trim WhatsApp, objection streak
 - `intelligence.build_lead_context` — “já sabemos / ainda falta” (anti-repetição)
-- `intelligence.build_system_prompt` — bloco de política de turno + intent guidance
-- `skills.build_skills_context` — thresholds por `message_count` / stage / tier
-- `graph` — intent→agente/stage, `enforce_turn_policy` no parse, handoff por 2+ objeções
-- `run_sdr` — passa `agent` + `history` ao system prompt
+- Skills condicionais por `message_count` / stage / tier
+- Intent guia agente e stage no LangGraph
 
 ### P0 — LangGraph wire
 
@@ -46,7 +54,7 @@ Injetadas sob condição (P1):
 
 ## Stack
 
-WhatsApp (Evolution) → LangGraph (P0+P1) → playbook + guardrails + turn policy + skills + META → Supabase
+WhatsApp (Evolution) → LangGraph (P0+P1+P2) → playbook + guardrails + turn policy + skills + META tools → Supabase / Twenty
 
 ---
 
@@ -54,10 +62,11 @@ WhatsApp (Evolution) → LangGraph (P0+P1) → playbook + guardrails + turn poli
 
 - [x] Wire LangGraph P0
 - [x] P1 turn policy / intent routing / skills condicionais
-- UI badges ICP/health no console
-- List building em massa (Composio/Twenty)
+- [x] UI badges ICP/health no console
+- [x] List building em massa
+- [x] Tools formais no closer (registry + META)
 - Billing · E2E
-- Tools formais no closer (bind_tools)
+- bind_tools nativo (OpenAI tools) opcional
 
 ---
 
