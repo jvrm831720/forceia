@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { AgendaItem } from "@/types/dashboard";
 
 const STATUS_VARIANT = {
@@ -17,39 +18,40 @@ export function AgendaToday({ items }: { items: AgendaItem[] }) {
     <section className="border border-border bg-canvas">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <h2 className="text-[13px] font-medium text-ink">Agenda</h2>
-        <span className="font-mono text-[11px] text-ink-soft">{items.length}</span>
+        <span className="font-mono text-[11px] text-ink-soft">{items.length} hoje</span>
       </div>
       {items.length === 0 ? (
-        <p className="px-3 py-6 text-center text-xs text-ink-soft">Sem reuniões</p>
+        <p className="px-3 py-8 text-center text-[12px] text-ink-soft">
+          Nenhuma reunião agendada
+        </p>
       ) : (
-        <table className="w-full text-left text-[13px]">
-          <thead>
-            <tr className="border-b border-border text-label">
-              <th className="px-3 py-1.5 font-medium">Hora</th>
-              <th className="px-3 py-1.5 font-medium">Empresa</th>
-              <th className="hidden px-3 py-1.5 font-medium sm:table-cell">Contato</th>
-              <th className="hidden px-3 py-1.5 font-medium md:table-cell">Owner</th>
-              <th className="px-3 py-1.5 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {items.map((item) => (
-              <tr key={item.id} className="transition-ui hover:bg-surface">
-                <td className="px-3 py-2 font-mono text-xs tabular-nums text-ink">{item.time}</td>
-                <td className="px-3 py-2 font-medium text-ink">{item.company}</td>
-                <td className="hidden px-3 py-2 text-ink-muted sm:table-cell">
-                  {item.contact ?? "—"}
-                </td>
-                <td className="hidden px-3 py-2 text-ink-muted md:table-cell">{item.owner}</td>
-                <td className="px-3 py-2">
-                  <Badge variant={STATUS_VARIANT[item.status]}>
-                    {STATUS_LABEL[item.status]}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ul className="divide-y divide-border">
+          {items.map((item) => (
+            <li
+              key={item.id}
+              className="flex items-stretch gap-0 transition-ui hover:bg-surface"
+            >
+              <div className="flex w-14 shrink-0 flex-col items-center justify-center border-r border-border bg-background/50 py-2.5">
+                <span className="font-mono text-[12px] font-medium tabular-nums text-ink">
+                  {item.time}
+                </span>
+              </div>
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-medium text-ink">
+                    {item.company}
+                  </p>
+                  <p className="truncate text-[11px] text-ink-soft">
+                    {[item.contact, item.owner].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+                <Badge variant={STATUS_VARIANT[item.status]}>
+                  {STATUS_LABEL[item.status]}
+                </Badge>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );

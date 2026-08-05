@@ -20,12 +20,12 @@ const KIND_COLOR: Record<ActivityKind, string> = {
 
 export function ActivityFeed({ items }: { items: ActivityItem[] }) {
   return (
-    <section className="border border-border bg-canvas">
+    <section className="flex h-full flex-col border border-border bg-canvas">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <h2 className="text-[13px] font-medium text-ink">Atividade</h2>
+        <h2 className="text-[13px] font-medium text-ink">Timeline operacional</h2>
         <span className="text-label">Live</span>
       </div>
-      <ul className="divide-y divide-border">
+      <ul className="min-h-0 flex-1 divide-y divide-border overflow-auto">
         {items.map((item) => (
           <li
             key={item.id}
@@ -37,7 +37,7 @@ export function ActivityFeed({ items }: { items: ActivityItem[] }) {
               {KIND_LABEL[item.kind] ?? "EVT"}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] text-ink">{item.title}</p>
+              <p className="text-[13px] leading-snug text-ink">{item.title}</p>
               {item.description && (
                 <p className="mt-0.5 line-clamp-1 text-[11px] text-ink-soft">
                   {item.description}
