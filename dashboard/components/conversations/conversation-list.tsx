@@ -7,6 +7,28 @@ import { ConversationFilters } from "./filters";
 import { ConversationSearch } from "./search";
 import { ConversationsEmptyState } from "./empty-state";
 
+function buildFilterCounts(
+  conversations: Conversation[]
+): Record<ConversationFilter, number> {
+  const counts: Record<ConversationFilter, number> = {
+    all: 0,
+    ai: 0,
+    attention: 0,
+    human: 0,
+    closed: 0,
+  };
+
+  for (const c of conversations) {
+    counts.all += 1;
+    if (c.status === "ai_handling") counts.ai += 1;
+    else if (c.status === "needs_attention") counts.attention += 1;
+    else if (c.status === "human") counts.human += 1;
+    else if (c.status === "closed") counts.closed += 1;
+  }
+
+  return counts;
+}
+
 export function ConversationList({
   conversations,
   selectedId,
@@ -25,14 +47,7 @@ export function ConversationList({
   onSelect: (id: string) => void;
 }) {
   const filtered = filterConversations(conversations, filter, search);
-
-  const counts: Partial<Record<ConversationFilter, number>> = {
-    all: conversations.length,
-    ai: conversations.filter((c) => c.status === "ai_handling").length,
-    attention: conversations.filter((c) => c.status === "needs_attention").length,
-    human: conversations.filter((c) => c.status === "human").length,
-    closed: conversations.filter((c) => c.status === "closed").length,
-  };
+  const counts = buildFilterCounts(conversations);
 
   return (
     <div className="flex h-full flex-col border-r border-border bg-surface-card">

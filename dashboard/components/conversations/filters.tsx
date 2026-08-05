@@ -5,29 +5,30 @@ import type { ConversationFilter } from "@/types/conversation";
 
 const FILTERS: { id: ConversationFilter; label: string }[] = [
   { id: "all", label: "Todos" },
-  { id: "ai_handling", label: "IA Atendendo" },
-  { id: "needs_attention", label: "Precisa de Aten\u00e7\u00e3o" },
+  { id: "ai", label: "IA Atendendo" },
+  { id: "attention", label: "Atenção" },
   { id: "human", label: "Humano" },
-  { id: "finished", label: "Finalizadas" },
+  { id: "closed", label: "Finalizadas" },
 ];
 
 export function ConversationFilters({
   value,
-  counts,
   onChange,
+  counts,
 }: {
   value: ConversationFilter;
-  counts: Record<ConversationFilter, number>;
   onChange: (filter: ConversationFilter) => void;
+  counts: Record<ConversationFilter, number>;
 }) {
   return (
     <div
-      className="flex gap-1.5 overflow-x-auto pb-0.5"
+      className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none"
       role="tablist"
-      aria-label="Filtrar conversas"
+      aria-label="Filtros de conversas"
     >
       {FILTERS.map((f) => {
         const active = value === f.id;
+        const count = counts[f.id];
         return (
           <button
             key={f.id}
@@ -36,21 +37,23 @@ export function ConversationFilters({
             aria-selected={active}
             onClick={() => onChange(f.id)}
             className={cn(
-              "shrink-0 rounded-full px-3 py-1.5 text-[12px] font-semibold transition duration-200",
+              "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition duration-200",
               active
                 ? "bg-brand text-white shadow-card"
                 : "bg-white text-ink-muted border border-border hover:text-ink hover:bg-border-soft"
             )}
           >
             {f.label}
-            <span
-              className={cn(
-                "ml-1.5 tabular-nums",
-                active ? "text-white/80" : "text-ink-soft"
-              )}
-            >
-              {counts[f.id]}
-            </span>
+            {count > 0 && (
+              <span
+                className={cn(
+                  "inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold",
+                  active ? "bg-white/25 text-white" : "bg-border-soft text-ink-muted"
+                )}
+              >
+                {count}
+              </span>
+            )}
           </button>
         );
       })}
