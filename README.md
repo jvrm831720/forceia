@@ -1,12 +1,10 @@
 # ForceIA
 
-**Time de vendas de IA multi-tenant** — WhatsApp + SDR / Closer / Follow-up + Supabase + Twenty.
-
-> A força de vendas que nunca dorme.
-
 ![CI](https://github.com/jvrm831720/forceia/actions/workflows/ci.yml/badge.svg)
-![Python](https://img.shields.io/badge/python-3.11%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+
+**ForceIA** — time de vendas com IA que trabalha 24h.
+
+Agentes SDR + Closer + Follow-up + Relatórios no WhatsApp.
 
 Repo: https://github.com/jvrm831720/forceia
 
@@ -83,7 +81,7 @@ Na Vercel (Settings → General):
 | **Install Command** | `npm install` |
 | **Build Command** | `npm run build` |
 | **Output Directory** | *(vazio — gerenciado pelo Next.js)* |
-| **Node.js Version** | 20.x |
+| **Node.js Version** | 24.x |
 
 ```bash
 cd dashboard
@@ -97,74 +95,3 @@ npm run dev
 Detalhes: [dashboard/README.md](dashboard/README.md).
 
 ## Deploy 24/7
-
-```bash
-# Infra (Evolution + Postgres + Redis) + app (webhook + admin)
-docker compose --profile app up -d --build
-```
-
-Guia completo (VPS, Railway/Render, HTTPS, cron): [docs/DEPLOY.md](docs/DEPLOY.md).
-
-## Comandos úteis
-
-```bash
-cd agents
-python webhook_server.py                    # webhook multi-tenant
-python admin_server.py                      # painel admin
-python followup_job.py --all --dry-run      # follow-up (simulação)
-python scheduler.py --hours 6 --all         # scheduler em processo
-python sync_twenty_job.py --workspace default
-```
-
-## Testes e qualidade
-
-```bash
-ruff check agents   # lint
-pytest              # testes unitários, sem serviços externos
-```
-
-CI roda `ruff` + `pytest` em Python 3.11 e 3.12 a cada push/PR.
-
-## Estrutura
-
-```
-CODEBASE.md        mapa vivo do repositório (comece por aqui)
-agents/            agentes, webhook, painel admin, jobs e testes
-dashboard/         Painel Cliente Next.js (deploy Vercel → Root Directory: dashboard)
-web/               console React legado (Vite)
-config/prompts/    prompts editáveis (sdr / closer / followup)
-supabase/          schema + migrations
-docker/            init do Postgres da Evolution
-docs/              documentação temática
-```
-
-## Documentação
-
-**[CODEBASE.md](CODEBASE.md)** (mapa completo) ·
-[Setup](docs/SETUP.md) · [Deploy](docs/DEPLOY.md) · [Admin](docs/ADMIN.md) ·
-[Multi-tenant](docs/MULTI_TENANT.md) · [Supabase](docs/SUPABASE.md) ·
-[Twenty](docs/TWENTY.md) · [Integrações](docs/INTEGRATIONS.md) ·
-[Follow-up](docs/FOLLOWUP.md) · [Playbook](docs/PLAYBOOK.md) ·
-[Elite](docs/ELITE.md) · [Arquitetura](docs/ARCHITECTURE.md)
-
-## Roadmap
-
-- [x] MVP: agentes + WhatsApp + Supabase multi-tenant + follow-up + Twenty
-- [x] Painel admin (métricas, leads, criação de workspace)
-- [x] Idempotência + segurança do webhook
-- [x] Logging estruturado (JSON)
-- [x] Testes + CI
-- [x] Dockerfile + deploy documentado
-- [x] Camada de integrações Fase 0+1 (Composio session/authorize/API)
-- [x] Playbook por workspace (ICP, pricing, cases, tom → system prompt)
-- [x] Módulos elite: score, intent, enrichment, closer tools + API
-- [x] Dashboard cliente Next.js (`dashboard/`)
-- [ ] Billing por plano (Asaas/Stripe)
-- [ ] Testes E2E com mensagem real
-
-## Licença
-
-[MIT](LICENSE).
-
----
-ForceIA — a força de vendas que nunca dorme.
