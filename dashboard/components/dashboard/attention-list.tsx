@@ -2,26 +2,33 @@ import { Badge } from "@/components/ui/badge";
 import type { AttentionItem, Priority } from "@/types/dashboard";
 import Link from "next/link";
 
-const PRIORITY: Record<Priority, "danger" | "warning" | "muted"> = { high: "danger", medium: "warning", low: "muted" };
+const PRIORITY: Record<Priority, "danger" | "warning" | "muted"> = {
+  high: "danger",
+  medium: "warning",
+  low: "muted",
+};
 
 export function AttentionList({ items }: { items: AttentionItem[] }) {
   return (
-    <section className="rounded-lg border border-border bg-surface">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="font-display text-sm font-semibold tracking-tight text-ink">Precisa da sua atenção</h2>
-        <span className="text-label">{items.length}</span>
+    <section className="border border-border bg-canvas">
+      <div className="flex items-center justify-between border-b border-border px-3 py-2">
+        <h2 className="text-[13px] font-medium text-ink">Handoffs</h2>
+        <span className="font-mono text-[11px] text-warning">{items.length}</span>
       </div>
       <ul className="divide-y divide-border">
         {items.map((item) => (
           <li key={item.id}>
-            <Link href={`/conversas?c=${item.conversationId}`} className="flex items-start gap-3 px-4 py-3 transition-ui hover:bg-surface-hover">
+            <Link
+              href={`/conversas?c=${item.conversationId}`}
+              className="flex items-start gap-2 px-3 py-2 transition-ui hover:bg-surface"
+            >
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="truncate text-sm font-medium text-ink">{item.name}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-[13px] font-medium text-ink">{item.name}</p>
                   <Badge variant={PRIORITY[item.priority]}>{item.priority}</Badge>
                 </div>
-                <p className="truncate text-xs text-ink-soft">{item.company}</p>
-                <p className="mt-1 text-xs text-ink-muted">{item.reason}</p>
+                <p className="truncate text-[11px] text-ink-soft">{item.company}</p>
+                <p className="mt-0.5 text-[11px] text-ink-muted">{item.reason}</p>
               </div>
             </Link>
           </li>
