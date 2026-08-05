@@ -2,6 +2,8 @@ import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { AgendaToday } from "@/components/dashboard/agenda-today";
 import { AttentionList } from "@/components/dashboard/attention-list";
 import { MetricCards } from "@/components/dashboard/metric-cards";
+import { OpsChart } from "@/components/dashboard/ops-chart";
+import { OpsToolbar } from "@/components/dashboard/ops-toolbar";
 import { TeamSection } from "@/components/dashboard/team-section";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -20,33 +22,19 @@ export default async function DashboardPage() {
         />
         <main className="flex-1 px-3 py-3 sm:px-4 sm:py-4">
           <div className="mx-auto flex max-w-7xl flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h1 className="text-[13px] font-medium tracking-tight text-ink">Operations</h1>
-                <p className="text-[11px] text-ink-soft">Tempo real · {data.workspace.companyName}</p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-40" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
-                </span>
-                <span className="text-[11px] text-ink-soft">IA ativa</span>
-              </div>
-            </div>
-
+            <OpsToolbar workspace={data.workspace} />
+            <OpsChart />
             <MetricCards metrics={data.metrics} />
-
-            <div className="grid gap-3 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <TeamSection agents={data.agents} />
+            <div className="grid gap-3 lg:grid-cols-5">
+              <div className="lg:col-span-3">
+                <ActivityFeed items={data.activity} />
               </div>
-              <AttentionList items={data.attention} />
+              <div className="lg:col-span-2">
+                <AttentionList items={data.attention} />
+              </div>
             </div>
-
-            <div className="grid gap-3 lg:grid-cols-2">
-              <ActivityFeed items={data.activity} />
-              <AgendaToday items={data.agenda} />
-            </div>
+            <TeamSection agents={data.agents} />
+            <AgendaToday items={data.agenda} />
           </div>
         </main>
       </div>
