@@ -5,9 +5,17 @@ import {
   agentLabel,
   formatMessageTime,
   statusCode,
+  statusLabel,
 } from "@/lib/conversation-utils";
 import type { Conversation } from "@/types/conversation";
 
+/**
+ * Midday inbox-item structure:
+ * h-[90px] · border · p-4 · flex-col gap-2
+ * Row 1: name (font-semibold) + time (text-xs)
+ * Row 2: secondary metric + status
+ * Selected: bg-accent + border elevated
+ */
 export function ConversationItem({
   conversation,
   selected,
@@ -28,63 +36,68 @@ export function ConversationItem({
       onClick={() => onSelect(conversation.id)}
       aria-current={selected ? "true" : undefined}
       className={cn(
-        "group relative flex h-11 w-full items-center gap-2 border-b border-border px-3 text-left transition-colors duration-100",
-        selected ? "bg-surface" : "hover:bg-surface/60",
-        needsYou && !selected && "bg-warning-soft/20",
+        "flex h-[90px] w-full flex-col items-start gap-2 border border-border p-4 text-left text-sm transition-colors",
+        selected
+          ? "border-[#2C2C2C] bg-elevated"
+          : "hover:bg-surface",
+        needsYou && !selected && "border-warning/40",
       )}
     >
-      <span
-        className={cn(
-          "absolute left-0 top-0 h-full w-0.5",
-          selected && "bg-ink",
-          needsYou && !selected && "bg-warning",
-          !selected && !needsYou && "bg-transparent group-hover:bg-border",
-        )}
-        aria-hidden
-      />
-
-      <span
-        className={cn(
-          "w-7 shrink-0 text-mono font-medium tabular-nums",
-          code === "HO" && "text-warning",
-          code === "AI" && "text-ink-muted",
-          code === "HUM" && "text-ink-soft",
-          code === "DONE" && "text-ink-soft",
-        )}
-      >
-        {code}
-      </span>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-1.5">
-          <span
+      <div className="flex w-full flex-col gap-1">
+        <div className="mb-1 flex items-center">
+          <div className="flex min-w-0 items-center gap-2">
+            <span
+              className={cn(
+                "truncate font-semibold text-ink",
+                unread && "font-semibold",
+              )}
+            >
+              {conversation.leadName}
+            </span>
+            <span
+              className={cn(
+                "shrink-0 font-mono text-[10px] font-medium tabular-nums",
+                code === "HO" && "text-warning",
+                code === "AI" && "text-ink-muted",
+                code === "HUM" && "text-ink-soft",
+                code === "DONE" && "text-ink-soft",
+              )}
+            >
+              {code}
+            </span>
+            {unread && (
+              <span className="shrink-0 font-mono text-[10px] text-brand tabular-nums">
+                {conversation.unreadCount}
+              </span>
+            )}
+          </div>
+          <time
             className={cn(
-              "truncate text-[13px] font-medium leading-4 text-ink",
-              unread && "font-medium",
+              "ml-auto shrink-0 text-xs",
+              selected ? "text-ink" : "text-ink-soft",
             )}
           >
-            {conversation.leadName}
-          </span>
-          {unread && (
-            <span className="shrink-0 text-mono text-brand tabular-nums">
-              {conversation.unreadCount}
-            </span>
-          )}
+            {formatMessageTime(conversation.lastMessageAt)}
+          </time>
         </div>
-        <p className="truncate text-[12px] leading-4 text-ink-soft">
-          {conversation.company}
-          <span className="text-ink-soft/60"> · </span>
-          {conversation.lastMessage}
-        </p>
-      </div>
 
-      <div className="flex shrink-0 flex-col items-end gap-0.5">
-        <time className="text-mono text-ink-soft">
-          {formatMessageTime(conversation.lastMessageAt)}
-        </time>
-        <span className="text-[10px] leading-3 text-ink-soft">
-          {agentLabel(conversation.currentOwner)}
-        </span>
+        <div className="flex w-full items-center">
+          <p className="min-w-0 truncate text-xs font-medium text-ink-muted">
+            {conversation.company}
+            <span className="font-normal text-ink-soft"> · </span>
+            <span className="font-normal text-ink-soft">
+              {conversation.lastMessage}
+            </span>
+          </p>
+          <span
+            className={cn(
+              "ml-auto shrink-0 pl-2 text-xs",
+              needsYou ? "text-warning" : "text-ink-soft",
+            )}
+          >
+            {needsYou ? statusLabel(conversation.status) : agentLabel(conversation.currentOwner)}
+          </span>
+        </div>
       </div>
     </button>
   );

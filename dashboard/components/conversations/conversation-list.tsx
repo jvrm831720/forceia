@@ -7,6 +7,8 @@ import { ConversationFilters } from "./filters";
 import { ConversationSearch } from "./search";
 import { ConversationsEmptyState } from "./empty-state";
 
+const ITEM_GAP = 16;
+
 function buildFilterCounts(
   conversations: Conversation[],
 ): Record<ConversationFilter, number> {
@@ -27,6 +29,7 @@ function buildFilterCounts(
   return counts;
 }
 
+/** Midday list column: header + search/tabs, then items with gap-4 (16px). */
 export function ConversationList({
   conversations,
   selectedId,
@@ -48,20 +51,20 @@ export function ConversationList({
   const counts = buildFilterCounts(conversations);
 
   return (
-    <div className="flex h-full flex-col border-r border-border bg-background">
-      <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-3">
-        <span className="text-[13px] font-medium text-ink">Conversas</span>
-        <span className="text-mono text-ink-soft">{counts.all}</span>
-      </div>
-      <div className="border-b border-border px-3 py-1.5">
+    <div className="flex h-full min-w-0 flex-1 flex-col">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <ConversationFilters
+          value={filter}
+          onChange={onFilterChange}
+          counts={counts}
+        />
         <ConversationSearch value={search} onChange={onSearchChange} />
       </div>
-      <ConversationFilters
-        value={filter}
-        onChange={onFilterChange}
-        counts={counts}
-      />
-      <div className="min-h-0 flex-1 overflow-y-auto">
+
+      <div
+        className="relative min-h-0 flex-1 overflow-auto"
+        style={{ height: "calc(100vh - 180px)" }}
+      >
         {filtered.length === 0 ? (
           <ConversationsEmptyState
             title={search ? "Nenhum resultado" : "Nenhuma conversa"}
@@ -72,14 +75,16 @@ export function ConversationList({
             }
           />
         ) : (
-          filtered.map((c) => (
-            <ConversationItem
-              key={c.id}
-              conversation={c}
-              selected={selectedId === c.id}
-              onSelect={onSelect}
-            />
-          ))
+          <div className="flex flex-col" style={{ gap: ITEM_GAP }}>
+            {filtered.map((c) => (
+              <ConversationItem
+                key={c.id}
+                conversation={c}
+                selected={selectedId === c.id}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>
