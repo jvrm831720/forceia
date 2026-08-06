@@ -7,7 +7,9 @@ import { ConversationInput } from "./conversation-input";
 import { HandoffCard } from "./handoff-card";
 import { MessageBubble } from "./message-bubble";
 import { TypingIndicator } from "./typing-indicator";
+import type { ReactNode } from "react";
 
+/** Midday details panel: actions · identity · body · footer. ForceIA thread. */
 export function ConversationView({
   conversation,
   onBack,
@@ -18,6 +20,7 @@ export function ConversationView({
   onOpenLead,
   onDismissHandoff,
   onSend,
+  contextSlot,
 }: {
   conversation: Conversation | null;
   onBack?: () => void;
@@ -28,12 +31,13 @@ export function ConversationView({
   onOpenLead: () => void;
   onDismissHandoff: () => void;
   onSend: (text: string) => void;
+  contextSlot?: ReactNode;
 }) {
   if (!conversation) {
     return (
-      <div className="flex h-full flex-col items-center justify-center border-r border-border bg-background px-6 text-center">
-        <p className="text-[13px] text-ink">Nenhuma conversa selecionada</p>
-        <p className="mt-1 max-w-xs text-[12px] text-ink-soft">
+      <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+        <p className="text-sm font-medium text-ink">Nenhuma conversa selecionada</p>
+        <p className="mt-1 max-w-[250px] text-xs text-ink-soft">
           Selecione uma conversa para acompanhar a operação.
         </p>
       </div>
@@ -58,51 +62,55 @@ export function ConversationView({
         : null;
 
   return (
-    <div className="flex h-full min-w-0 flex-1 flex-col border-r border-border bg-background">
-      <ConversationHeader
-        conversation={conversation}
-        onBack={onBack}
-        onAssume={onAssume}
-        onReturnToAi={onReturnToAi}
-        onResolve={onResolve}
-        onAddNote={onAddNote}
-        onOpenLead={onOpenLead}
-      />
-
-      {showHandoff && conversation.handoff && (
-        <HandoffCard
-          handoff={conversation.handoff}
+    <div className="flex h-full min-w-0 flex-1 overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <ConversationHeader
+          conversation={conversation}
+          onBack={onBack}
           onAssume={onAssume}
-          onDismiss={onDismissHandoff}
+          onReturnToAi={onReturnToAi}
+          onResolve={onResolve}
+          onAddNote={onAddNote}
+          onOpenLead={onOpenLead}
         />
-      )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {conversation.messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-6">
-            <p className="text-[12px] text-ink-soft">
-              Nenhuma mensagem. Aguardando atividade.
-            </p>
-          </div>
-        ) : (
-          conversation.messages.map((m) => (
-            <MessageBubble key={m.id} message={m} />
-          ))
+        {showHandoff && conversation.handoff && (
+          <HandoffCard
+            handoff={conversation.handoff}
+            onAssume={onAssume}
+            onDismiss={onDismissHandoff}
+          />
         )}
-        {typingLabel && <TypingIndicator label={typingLabel} />}
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {conversation.messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center px-6">
+              <p className="text-xs text-ink-soft">
+                Nenhuma mensagem. Aguardando atividade.
+              </p>
+            </div>
+          ) : (
+            conversation.messages.map((m) => (
+              <MessageBubble key={m.id} message={m} />
+            ))
+          )}
+          {typingLabel && <TypingIndicator label={typingLabel} />}
+        </div>
+
+        <ConversationInput
+          onSend={onSend}
+          disabled={isClosed}
+          placeholder={
+            isClosed
+              ? "Conversa resolvida"
+              : conversation.currentOwner === "human"
+                ? "Escrever como humano…"
+                : "Assuma para enviar, ou aguarde a IA"
+          }
+        />
       </div>
 
-      <ConversationInput
-        onSend={onSend}
-        disabled={isClosed}
-        placeholder={
-          isClosed
-            ? "Conversa resolvida"
-            : conversation.currentOwner === "human"
-              ? "Escrever como humano…"
-              : "Assuma para enviar, ou aguarde a IA"
-        }
-      />
+      {contextSlot}
     </div>
   );
 }
