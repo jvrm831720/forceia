@@ -1,73 +1,61 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import {
-  agentLabel,
-  formatMessageTime,
-} from "@/lib/conversation-utils";
+import { agentLabel, formatMessageTime } from "@/lib/conversation-utils";
 import type { ConversationMessage } from "@/types/conversation";
 
+/** Operational timeline row — not a chat bubble. */
 export function MessageBubble({ message }: { message: ConversationMessage }) {
-  const { sender, content, timestamp, agentRole, systemKind, status } = message;
+  const { sender, content, timestamp, agentRole, systemKind } = message;
 
   if (sender === "system") {
     return (
-      <div className="flex justify-center px-3 py-1.5">
-        <div className="max-w-[90%] border border-border bg-background px-2.5 py-1.5 text-center">
-          <p className="text-meta text-ink-muted">{content}</p>
-          <p className="mt-0.5 text-mono text-ink-soft">
+      <div className="border-b border-border px-4 py-2">
+        <p className="text-center text-[11px] text-ink-soft">
+          {content}
+          <span className="ml-2 text-mono">
             {formatMessageTime(timestamp)}
             {systemKind ? ` · ${systemKind}` : ""}
-          </p>
-        </div>
+          </span>
+        </p>
       </div>
     );
   }
 
-  const isLead = sender === "lead";
-  const isAi = sender === "ai";
-  const isHuman = sender === "human";
+  const who =
+    sender === "lead"
+      ? "LEAD"
+      : sender === "human"
+        ? "HUM"
+        : agentRole
+          ? agentLabel(agentRole).replace(" IA", "").toUpperCase()
+          : "IA";
 
   return (
-    <div
+    <article
       className={cn(
-        "flex px-3 py-1",
-        isLead ? "justify-start" : "justify-end",
+        "border-b border-border px-4 py-2.5",
+        sender === "ai" && "bg-surface/40",
       )}
     >
-      <div
-        className={cn(
-          "max-w-[min(100%,420px)] border px-3 py-2",
-          isLead && "border-border bg-surface",
-          isAi && "border-brand/30 bg-brand-soft/40",
-          isHuman && "border-border bg-elevated",
-        )}
-      >
-        <div className="mb-1 flex items-center gap-1.5">
-          <span
-            className={cn(
-              "text-mono font-medium",
-              isLead && "text-ink-muted",
-              isAi && "text-brand",
-              isHuman && "text-ink-soft",
-            )}
-          >
-            {isLead && "LEAD"}
-            {isAi &&
-              (agentRole
-                ? agentLabel(agentRole).replace(" IA", "").toUpperCase()
-                : "IA")}
-            {isHuman && "HUM"}
-          </span>
-          <span className="text-mono text-ink-soft">
-            {formatMessageTime(timestamp)}
-          </span>
-          {status && isHuman && (
-            <span className="text-mono text-ink-soft">{status}</span>
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <span
+          className={cn(
+            "text-mono font-medium",
+            sender === "ai" && "text-brand",
+            sender === "lead" && "text-ink-muted",
+            sender === "human" && "text-ink-soft",
           )}
-        </div>
-        <p className="whitespace-pre-wrap text-body text-ink">{content}</p>
+        >
+          {who}
+        </span>
+        <time className="text-mono text-ink-soft">
+          {formatMessageTime(timestamp)}
+        </time>
       </div>
-    </div>
+      <p className="whitespace-pre-wrap text-[13px] leading-5 text-ink">
+        {content}
+      </p>
+    </article>
   );
 }

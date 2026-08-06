@@ -1,7 +1,6 @@
 "use client";
 
 import { Search } from "lucide-react";
-import { Icon } from "@/components/ui/icon";
 
 export function ConversationSearch({
   value,
@@ -12,17 +11,17 @@ export function ConversationSearch({
 }) {
   return (
     <label className="relative block">
-      <Icon
-        icon={Search}
-        size="sm"
-        className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-soft"
+      <Search
+        className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-soft"
+        strokeWidth={1.75}
+        aria-hidden
       />
       <input
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Buscar conversa…"
-        className="h-8 w-full rounded-md border border-border bg-surface pl-8 pr-2.5 text-body text-ink placeholder:text-ink-soft transition-ui duration-fast focus:border-brand focus:outline-none focus:shadow-focus"
+        placeholder="Buscar…"
+        className="h-7 w-full border-0 border-b border-border bg-transparent pl-7 pr-2 text-[13px] text-ink placeholder:text-ink-soft focus:border-ink-muted focus:outline-none"
       />
     </label>
   );

@@ -5,8 +5,8 @@ import type { ConversationFilter } from "@/types/conversation";
 
 const FILTERS: { id: ConversationFilter; label: string }[] = [
   { id: "all", label: "Todas" },
-  { id: "ai", label: "Em operação" },
-  { id: "attention", label: "Precisa de você" },
+  { id: "ai", label: "IA" },
+  { id: "attention", label: "Você" },
   { id: "human", label: "Humano" },
   { id: "closed", label: "Resolvidas" },
 ];
@@ -21,7 +21,11 @@ export function ConversationFilters({
   counts: Record<ConversationFilter, number>;
 }) {
   return (
-    <div className="flex flex-wrap gap-1" role="tablist" aria-label="Filtros de conversa">
+    <div
+      className="flex gap-0 overflow-x-auto border-b border-border"
+      role="tablist"
+      aria-label="Filtros"
+    >
       {FILTERS.map((f) => {
         const active = value === f.id;
         return (
@@ -32,14 +36,16 @@ export function ConversationFilters({
             aria-selected={active}
             onClick={() => onChange(f.id)}
             className={cn(
-              "inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-meta transition-ui duration-fast",
+              "shrink-0 border-b-2 px-2.5 py-1.5 text-[12px] transition-colors duration-100",
               active
-                ? "border-border bg-elevated text-ink"
-                : "border-transparent text-ink-soft hover:bg-surface hover:text-ink-muted",
+                ? "border-ink text-ink"
+                : "border-transparent text-ink-soft hover:text-ink-muted",
             )}
           >
             {f.label}
-            <span className="text-mono text-ink-soft">{counts[f.id] ?? 0}</span>
+            <span className="ml-1 text-mono text-ink-soft">
+              {counts[f.id] ?? 0}
+            </span>
           </button>
         );
       })}

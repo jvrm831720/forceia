@@ -1,21 +1,12 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import {
-  agentBadgeVariant,
   agentLabel,
   formatMessageTime,
   statusCode,
 } from "@/lib/conversation-utils";
 import type { Conversation } from "@/types/conversation";
-
-const CODE_COLOR: Record<string, string> = {
-  AI: "text-brand",
-  HO: "text-warning",
-  HUM: "text-ink-muted",
-  DONE: "text-ink-soft",
-};
 
 export function ConversationItem({
   conversation,
@@ -26,65 +17,64 @@ export function ConversationItem({
   selected: boolean;
   onSelect: (id: string) => void;
 }) {
-  const {
-    id,
-    leadName,
-    company,
-    lastMessage,
-    lastMessageAt,
-    currentOwner,
-    status,
-    unreadCount,
-  } = conversation;
-
-  const code = statusCode(status);
-  const needsYou = status === "needs_attention";
+  const code = statusCode(conversation.status);
+  const needsYou = conversation.status === "needs_attention";
+  const unread =
+    typeof conversation.unreadCount === "number" && conversation.unreadCount > 0;
 
   return (
     <button
       type="button"
-      onClick={() => onSelect(id)}
+      onClick={() => onSelect(conversation.id)}
       aria-current={selected ? "true" : undefined}
       className={cn(
-        "group relative flex w-full gap-2.5 border-l-2 px-3 py-2.5 text-left transition-ui duration-fast",
-        selected
-          ? "border-l-brand bg-surface"
-          : needsYou
-            ? "border-l-warning hover:bg-surface"
-            : "border-l-transparent hover:bg-surface",
+        "grid w-full grid-cols-[28px_1fr_auto] gap-x-2 border-b border-border px-3 py-2 text-left transition-colors duration-100",
+        selected ? "bg-elevated" : "hover:bg-surface",
+        needsYou && !selected && "bg-warning-soft/30",
       )}
     >
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="truncate text-body font-medium text-ink">{leadName}</p>
-            <p className="truncate text-meta text-ink-soft">{company}</p>
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-0.5">
-            <time className="text-mono text-ink-soft">
-              {formatMessageTime(lastMessageAt)}
-            </time>
-            {typeof unreadCount === "number" && unreadCount > 0 && (
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-sm bg-brand px-1 text-mono text-white">
-                {unreadCount}
-              </span>
+      <span
+        className={cn(
+          "pt-0.5 text-mono font-medium tabular-nums",
+          code === "HO" && "text-warning",
+          code === "AI" && "text-ink-muted",
+          code === "HUM" && "text-ink-soft",
+          code === "DONE" && "text-ink-soft",
+        )}
+      >
+        {code}
+      </span>
+
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-1.5">
+          <span
+            className={cn(
+              "truncate text-[13px] leading-4 text-ink",
+              unread && "font-medium",
             )}
-          </div>
-        </div>
-
-        <p className="mt-1 line-clamp-1 text-meta text-ink-muted">{lastMessage}</p>
-
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <span className={cn("text-mono font-medium", CODE_COLOR[code] ?? "text-ink-soft")}>
-            {code}
+          >
+            {conversation.leadName}
           </span>
-          <span className="text-mono text-ink-soft">·</span>
-          <Badge variant={agentBadgeVariant(currentOwner)}>
-            {agentLabel(currentOwner)}
-          </Badge>
-          {needsYou && <Badge variant="warning">handoff</Badge>}
+          {unread && (
+            <span className="shrink-0 text-mono text-brand">
+              {conversation.unreadCount}
+            </span>
+          )}
         </div>
+        <p className="truncate text-[12px] leading-4 text-ink-soft">
+          {conversation.company}
+        </p>
+        <p className="mt-0.5 truncate text-[12px] leading-4 text-ink-soft">
+          {conversation.lastMessage}
+        </p>
+        <p className="mt-0.5 text-[11px] leading-4 text-ink-soft">
+          {agentLabel(conversation.currentOwner)}
+        </p>
       </div>
+
+      <time className="pt-0.5 text-right text-mono text-ink-soft">
+        {formatMessageTime(conversation.lastMessageAt)}
+      </time>
     </button>
   );
 }
