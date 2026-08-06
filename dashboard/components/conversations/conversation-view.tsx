@@ -31,10 +31,10 @@ export function ConversationView({
 }) {
   if (!conversation) {
     return (
-      <div className="flex h-full flex-col items-center justify-center border-r border-border bg-canvas px-6 text-center">
-        <p className="text-section text-ink">Nenhuma conversa selecionada</p>
-        <p className="mt-1 max-w-xs text-body-muted text-ink-soft">
-          Selecione uma conversa na lista para acompanhar a operação.
+      <div className="flex h-full flex-col items-center justify-center border-r border-border bg-background px-6 text-center">
+        <p className="text-[13px] text-ink">Nenhuma conversa selecionada</p>
+        <p className="mt-1 max-w-xs text-[12px] text-ink-soft">
+          Selecione uma conversa para acompanhar a operação.
         </p>
       </div>
     );
@@ -58,7 +58,7 @@ export function ConversationView({
         : null;
 
   return (
-    <div className="flex h-full min-w-0 flex-1 flex-col border-r border-border bg-canvas">
+    <div className="flex h-full min-w-0 flex-1 flex-col border-r border-border bg-background">
       <ConversationHeader
         conversation={conversation}
         onBack={onBack}
@@ -77,11 +77,11 @@ export function ConversationView({
         />
       )}
 
-      <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto py-2">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {conversation.messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-6 text-center">
-            <p className="text-body-muted text-ink-soft">
-              Nenhuma mensagem ainda. Aguardando atividade.
+          <div className="flex h-full items-center justify-center px-6">
+            <p className="text-[12px] text-ink-soft">
+              Nenhuma mensagem. Aguardando atividade.
             </p>
           </div>
         ) : (
@@ -89,12 +89,7 @@ export function ConversationView({
             <MessageBubble key={m.id} message={m} />
           ))
         )}
-        {typingLabel && (
-          <TypingIndicator
-            label={typingLabel}
-            align={conversation.isTyping === "ai" ? "right" : "left"}
-          />
-        )}
+        {typingLabel && <TypingIndicator label={typingLabel} />}
       </div>
 
       <ConversationInput

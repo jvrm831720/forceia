@@ -1,10 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Icon } from "@/components/ui/icon";
 import {
-  agentBadgeVariant,
   agentLabel,
   channelLabel,
   statusCode,
@@ -40,70 +37,64 @@ export function ConversationHeader({
 }) {
   const isClosed = conversation.status === "closed";
   const isHuman = conversation.currentOwner === "human";
-  const needsYou = conversation.status === "needs_attention";
   const code = statusCode(conversation.status);
 
   return (
-    <header className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border bg-canvas px-2 sm:px-3">
+    <header className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-2 sm:px-3">
       <div className="flex min-w-0 items-center gap-2">
         {onBack && (
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-soft transition-ui duration-fast hover:bg-surface hover:text-ink md:hidden"
-            aria-label="Voltar para lista"
+            className="inline-flex h-7 w-7 items-center justify-center text-ink-soft hover:text-ink md:hidden"
+            aria-label="Voltar"
           >
-            <Icon icon={ArrowLeft} size="sm" />
+            <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} />
           </button>
         )}
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="truncate text-section text-ink">
+          <div className="flex items-baseline gap-2">
+            <span className="truncate text-[13px] font-medium text-ink">
               {conversation.leadName}
-            </p>
+            </span>
             <span
               className={cn(
-                "text-mono font-medium",
-                needsYou ? "text-warning" : "text-brand",
+                "text-mono",
+                code === "HO" ? "text-warning" : "text-ink-soft",
               )}
             >
               {code}
             </span>
-            <Badge
-              variant={agentBadgeVariant(conversation.currentOwner)}
-              className="hidden sm:inline-flex"
-            >
-              {agentLabel(conversation.currentOwner)}
-            </Badge>
           </div>
-          <p className="truncate text-meta text-ink-soft">
+          <p className="truncate text-[11px] text-ink-soft">
             {conversation.company} · {channelLabel(conversation.channel)} ·{" "}
+            {agentLabel(conversation.currentOwner)} ·{" "}
             {statusLabel(conversation.status)}
           </p>
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-0.5">
         {!isClosed && (
           <>
             {isHuman ? (
               <Button
                 size="sm"
-                variant="soft"
+                variant="ghost"
                 onClick={onReturnToAi}
-                className="hidden sm:inline-flex"
+                className="hidden h-7 sm:inline-flex"
               >
-                <Icon icon={Bot} size="sm" />
-                Devolver para IA
+                <Bot className="h-3.5 w-3.5" strokeWidth={1.75} />
+                Devolver
               </Button>
             ) : (
               <Button
                 size="sm"
                 variant="secondary"
                 onClick={onAssume}
-                className="hidden sm:inline-flex"
+                className="hidden h-7 sm:inline-flex"
               >
-                <Icon icon={UserCheck} size="sm" />
+                <UserCheck className="h-3.5 w-3.5" strokeWidth={1.75} />
                 Assumir
               </Button>
             )}
@@ -111,19 +102,19 @@ export function ConversationHeader({
               size="sm"
               variant="ghost"
               onClick={onAddNote}
-              aria-label="Adicionar nota"
-              className="hidden md:inline-flex"
+              aria-label="Nota"
+              className="hidden h-7 w-7 p-0 md:inline-flex"
             >
-              <Icon icon={StickyNote} size="sm" />
+              <StickyNote className="h-3.5 w-3.5" strokeWidth={1.75} />
             </Button>
             <Button
               size="sm"
               variant="ghost"
               onClick={onResolve}
-              aria-label="Marcar como resolvida"
-              className="hidden md:inline-flex"
+              aria-label="Resolver"
+              className="hidden h-7 w-7 p-0 md:inline-flex"
             >
-              <Icon icon={CheckCircle2} size="sm" />
+              <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.75} />
             </Button>
           </>
         )}
@@ -131,9 +122,10 @@ export function ConversationHeader({
           size="sm"
           variant="ghost"
           onClick={onOpenLead}
-          aria-label="Abrir lead"
+          aria-label="Contexto"
+          className="h-7 w-7 p-0"
         >
-          <Icon icon={ExternalLink} size="sm" />
+          <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.75} />
         </Button>
       </div>
     </header>
