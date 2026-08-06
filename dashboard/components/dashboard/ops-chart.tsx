@@ -51,10 +51,7 @@ export function OpsChart() {
           <h2 className="text-section text-ink">Evolução operacional</h2>
           <span className="text-meta text-ink-soft">7 dias</span>
         </div>
-        <ul
-          className="flex flex-wrap items-center gap-x-3 gap-y-1"
-          aria-label="Legenda do gráfico"
-        >
+        <ul className="flex flex-wrap items-center gap-x-3 gap-y-1" aria-label="Legenda do gráfico">
           {LEGEND.map((l) => (
             <li key={l.key} className="flex items-center gap-1.5 text-meta text-ink-muted">
               <span
@@ -83,15 +80,7 @@ export function OpsChart() {
           {[0.25, 0.5, 0.75].map((g) => {
             const y = pad + (1 - g) * (H - pad * 2 - 14);
             return (
-              <line
-                key={g}
-                x1={pad}
-                x2={W - pad}
-                y1={y}
-                y2={y}
-                stroke="#232323"
-                strokeWidth={1}
-              />
+              <line key={g} x1={pad} x2={W - pad} y1={y} y2={y} stroke="#232323" strokeWidth={1} />
             );
           })}
 
@@ -99,27 +88,12 @@ export function OpsChart() {
             const step = (W - pad * 2) / (DAYS.length - 1);
             const x = pad + activeIdx * step;
             return (
-              <line
-                x1={x}
-                x2={x}
-                y1={pad}
-                y2={H - pad - 4}
-                stroke="#2B2B2B"
-                strokeWidth={1}
-                strokeDasharray="3 3"
-              />
+              <line x1={x} x2={x} y1={pad} y2={H - pad - 4} stroke="#2B2B2B" strokeWidth={1} strokeDasharray="3 3" />
             );
           })()}
 
           <path d={toArea(SERIES.pipeline, W, H, pad)} fill="rgba(5,181,219,0.10)" />
-          <path
-            d={toPath(SERIES.pipeline, W, H, pad)}
-            fill="none"
-            stroke="#05B5DB"
-            strokeWidth={2}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
+          <path d={toPath(SERIES.pipeline, W, H, pad)} fill="none" stroke="#05B5DB" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
           <path d={toPath(SERIES.leads, W, H, pad)} fill="none" stroke="#A7A7A7" strokeWidth={1.25} strokeLinejoin="round" />
           <path d={toPath(SERIES.qualified, W, H, pad)} fill="none" stroke="#0DA387" strokeWidth={1.25} strokeLinejoin="round" />
           <path d={toPath(SERIES.meetings, W, H, pad)} fill="none" stroke="#9B95FE" strokeWidth={1.25} strokeDasharray="4 3" strokeLinejoin="round" />
