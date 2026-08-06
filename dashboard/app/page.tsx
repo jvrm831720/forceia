@@ -20,12 +20,12 @@ export default async function DashboardPage() {
           workspace={data.workspace}
           notificationsCount={data.notificationsCount}
         />
-        <main className="flex-1 px-3 py-3 sm:px-4 sm:py-3.5">
-          <div className="mx-auto flex max-w-7xl flex-col gap-2.5 sm:gap-3">
+        <main className="flex-1 px-3 py-3 sm:px-4">
+          <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:gap-2.5">
             <OpsToolbar workspace={data.workspace} />
             <OpsChart />
             <MetricCards metrics={data.metrics} />
-            <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-5">
+            <div className="grid gap-2 sm:gap-2.5 lg:grid-cols-5">
               <div className="lg:col-span-3">
                 <ActivityFeed items={data.activity} />
               </div>
