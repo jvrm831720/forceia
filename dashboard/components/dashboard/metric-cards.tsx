@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { MetricCard } from "@/types/dashboard";
 
-/** Tiny 7-pt sparkline — pure presentation */
 function Spark({
   values,
   positive,
@@ -9,8 +8,8 @@ function Spark({
   values: number[];
   positive?: boolean;
 }) {
-  const w = 56;
-  const h = 16;
+  const w = 48;
+  const h = 14;
   const max = Math.max(...values);
   const min = Math.min(...values);
   const range = max - min || 1;
@@ -22,7 +21,7 @@ function Spark({
     })
     .join(" ");
   return (
-    <svg width={w} height={h} className="opacity-80" aria-hidden>
+    <svg width={w} height={h} className="opacity-70" aria-hidden>
       <polyline
         points={pts}
         fill="none"
@@ -51,7 +50,7 @@ export function MetricCards({ metrics }: { metrics: MetricCard[] }) {
           <div
             key={m.id}
             className={cn(
-              "group flex flex-col gap-1 px-3 py-2.5 transition-ui duration-fast hover:bg-surface",
+              "flex flex-col gap-1 px-3 py-2 transition-ui duration-fast hover:bg-surface",
               i > 0 && "border-l border-border",
               i >= 2 && "border-t border-border sm:border-t-0",
               i >= 3 && "sm:border-t lg:border-t-0",
@@ -65,7 +64,7 @@ export function MetricCards({ metrics }: { metrics: MetricCard[] }) {
             </div>
             <p
               className={cn(
-                "font-mono text-lg font-medium tabular-nums tracking-tight text-ink sm:text-xl",
+                "text-metric text-ink",
                 m.emphasis === "success" && "text-success",
                 m.emphasis === "alert" && "text-warning",
               )}
@@ -75,7 +74,7 @@ export function MetricCards({ metrics }: { metrics: MetricCard[] }) {
             {m.delta && (
               <p
                 className={cn(
-                  "font-mono text-[10px]",
+                  "text-mono",
                   m.deltaPositive === false ? "text-warning" : "text-success",
                 )}
               >
