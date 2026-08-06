@@ -6,9 +6,11 @@ export function ConversationsEmptyState({
   description?: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
-      <p className="text-[13px] text-ink">{title}</p>
-      <p className="mt-1 max-w-xs text-[12px] text-ink-soft">{description}</p>
+    <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+      <div className="max-w-[250px] space-y-1">
+        <p className="text-sm font-medium text-ink">{title}</p>
+        <p className="text-xs text-ink-soft">{description}</p>
+      </div>
     </div>
   );
 }
