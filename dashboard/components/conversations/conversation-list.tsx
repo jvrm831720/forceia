@@ -49,7 +49,7 @@ export function ConversationList({
 
   return (
     <div className="flex h-full flex-col border-r border-border bg-background">
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-3">
+      <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-3">
         <span className="text-[13px] font-medium text-ink">Conversas</span>
         <span className="text-mono text-ink-soft">{counts.all}</span>
       </div>
