@@ -48,41 +48,38 @@ export function ConversationList({
   const counts = buildFilterCounts(conversations);
 
   return (
-    <div className="flex h-full flex-col border-r border-border bg-canvas">
-      <div className="space-y-2 border-b border-border px-3 py-2.5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-section text-ink">Conversas</h2>
-          <span className="text-mono text-ink-soft">{counts.all}</span>
-        </div>
-        <ConversationSearch value={search} onChange={onSearchChange} />
-        <ConversationFilters
-          value={filter}
-          onChange={onFilterChange}
-          counts={counts}
-        />
+    <div className="flex h-full flex-col border-r border-border bg-background">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-border px-3">
+        <span className="text-[13px] font-medium text-ink">Conversas</span>
+        <span className="text-mono text-ink-soft">{counts.all}</span>
       </div>
-
+      <div className="border-b border-border px-3 py-1.5">
+        <ConversationSearch value={search} onChange={onSearchChange} />
+      </div>
+      <ConversationFilters
+        value={filter}
+        onChange={onFilterChange}
+        counts={counts}
+      />
       <div className="min-h-0 flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <ConversationsEmptyState
-            title={search ? "Nenhum resultado" : "Nenhuma conversa neste filtro"}
+            title={search ? "Nenhum resultado" : "Nenhuma conversa"}
             description={
               search
                 ? "Tente outro termo."
-                : "A equipe de IA ainda não iniciou atendimentos aqui."
+                : "A equipe de IA ainda não iniciou atendimentos neste filtro."
             }
           />
         ) : (
-          <div className="divide-y divide-border">
-            {filtered.map((c) => (
-              <ConversationItem
-                key={c.id}
-                conversation={c}
-                selected={selectedId === c.id}
-                onSelect={onSelect}
-              />
-            ))}
-          </div>
+          filtered.map((c) => (
+            <ConversationItem
+              key={c.id}
+              conversation={c}
+              selected={selectedId === c.id}
+              onSelect={onSelect}
+            />
+          ))
         )}
       </div>
     </div>

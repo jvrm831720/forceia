@@ -1,14 +1,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
-import { Send } from "lucide-react";
 import { useState } from "react";
 
 export function ConversationInput({
   onSend,
   disabled,
-  placeholder = "Escrever mensagem…",
+  placeholder = "Escrever…",
 }: {
   onSend: (text: string) => void;
   disabled?: boolean;
@@ -24,7 +22,7 @@ export function ConversationInput({
   };
 
   return (
-    <div className="border-t border-border bg-canvas px-3 py-2.5">
+    <div className="border-t border-border bg-background px-3 py-2">
       <div className="flex items-end gap-2">
         <textarea
           value={value}
@@ -38,7 +36,7 @@ export function ConversationInput({
           rows={2}
           disabled={disabled}
           placeholder={placeholder}
-          className="min-h-[40px] flex-1 resize-none rounded-md border border-border bg-surface px-2.5 py-2 text-body text-ink placeholder:text-ink-soft transition-ui duration-fast focus:border-brand focus:outline-none focus:shadow-focus disabled:opacity-50"
+          className="min-h-[36px] flex-1 resize-none border border-border bg-surface px-2.5 py-1.5 text-[13px] text-ink placeholder:text-ink-soft focus:border-ink-muted focus:outline-none disabled:opacity-40"
         />
         <Button
           type="button"
@@ -46,15 +44,11 @@ export function ConversationInput({
           variant="secondary"
           disabled={disabled || !value.trim()}
           onClick={submit}
-          aria-label="Enviar mensagem"
+          className="h-8"
         >
-          <Icon icon={Send} size="sm" />
           Enviar
         </Button>
       </div>
-      <p className="mt-1.5 text-meta text-ink-soft">
-        Enter envia · Shift+Enter nova linha
-      </p>
     </div>
   );
 }
