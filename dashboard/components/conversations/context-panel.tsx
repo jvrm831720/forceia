@@ -10,24 +10,18 @@ import type { Conversation } from "@/types/conversation";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
-function Block({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <section className="border-b border-border px-3 py-2.5">
-      <p className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-ink-soft">
+    <div className="flex flex-col gap-0.5 border-b border-border px-4 py-3">
+      <span className="text-[10px] font-medium uppercase tracking-wide text-ink-soft">
         {label}
-      </p>
+      </span>
       {children}
-    </section>
+    </div>
   );
 }
 
-/** Decision center — editorial order, not CRM sheet. */
+/** Midday secondary column — stacked meta rows. ForceIA decision content. */
 export function ContextPanel({
   conversation,
   onClose,
@@ -37,12 +31,12 @@ export function ContextPanel({
 }) {
   if (!conversation) {
     return (
-      <aside className="hidden h-full w-[280px] shrink-0 flex-col border-l border-border bg-background xl:flex">
-        <div className="flex h-9 items-center border-b border-border px-3">
-          <span className="text-[13px] font-medium text-ink">Decisão</span>
+      <aside className="hidden h-full w-[280px] shrink-0 flex-col border-l border-border xl:flex">
+        <div className="flex h-10 items-center border-b border-border px-4">
+          <span className="text-sm font-medium text-ink">Decisão</span>
         </div>
         <div className="flex flex-1 items-center justify-center px-4 text-center">
-          <p className="text-[12px] text-ink-soft">Selecione uma conversa.</p>
+          <p className="text-xs text-ink-soft">Selecione uma conversa.</p>
         </div>
       </aside>
     );
@@ -54,76 +48,76 @@ export function ContextPanel({
   return (
     <aside
       className={cn(
-        "flex h-full w-full flex-col border-l border-border bg-background",
+        "flex h-full w-full flex-col border-l border-border",
         "xl:w-[280px] xl:shrink-0",
       )}
     >
-      <div className="flex h-9 items-center justify-between border-b border-border px-3">
-        <span className="text-[13px] font-medium text-ink">Decisão</span>
+      <div className="flex h-10 items-center justify-between border-b border-border px-4">
+        <span className="text-sm font-medium text-ink">Decisão</span>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-7 w-7 items-center justify-center text-ink-soft hover:text-ink xl:hidden"
+            className="inline-flex h-8 w-8 items-center justify-center text-ink-soft hover:text-ink xl:hidden"
             aria-label="Fechar"
           >
-            <X className="h-3.5 w-3.5" strokeWidth={1.75} />
+            <X className="h-4 w-4" strokeWidth={1.75} />
           </button>
         )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <Block label="Operador">
-          <p className="text-[13px] font-medium text-ink">
+        <Row label="Operador">
+          <p className="text-sm font-medium text-ink">
             {agentLabel(opp.currentOwner)}
           </p>
-        </Block>
+        </Row>
 
-        <Block label="Status">
+        <Row label="Status">
           <p
             className={cn(
-              "text-[13px]",
+              "text-sm",
               needsYou ? "font-medium text-warning" : "text-ink",
             )}
           >
             {statusLabel(conversation.status)}
           </p>
-          <p className="mt-0.5 text-[12px] text-ink-soft">{opp.lastActivity}</p>
-        </Block>
+          <p className="text-xs text-ink-soft">{opp.lastActivity}</p>
+        </Row>
 
-        <Block label="Próxima decisão">
-          <p className="text-[13px] leading-5 text-ink">{opp.nextAction}</p>
-        </Block>
+        <Row label="Próxima decisão">
+          <p className="text-sm leading-relaxed text-ink">{opp.nextAction}</p>
+        </Row>
 
-        <Block label="Recomendação da IA">
-          <p className="text-[12px] leading-5 text-ink-muted">{opp.aiSummary}</p>
-        </Block>
+        <Row label="Recomendação da IA">
+          <p className="text-xs leading-relaxed text-ink-muted">{opp.aiSummary}</p>
+        </Row>
 
-        <Block label="Objetivo">
-          <p className="text-[13px] text-ink">{opp.pipelineStage}</p>
-          <p className="mt-0.5 text-[12px] text-ink-soft">
+        <Row label="Objetivo">
+          <p className="text-sm text-ink">{opp.pipelineStage}</p>
+          <p className="text-xs text-ink-soft">
             {temperatureLabel(opp.temperature)}
           </p>
-        </Block>
+        </Row>
 
-        <Block label="Sinais">
-          <div className="flex flex-wrap gap-1.5">
+        <Row label="Sinais">
+          <div className="flex flex-wrap gap-2">
             {opp.source && (
-              <span className="text-mono text-ink-soft">{opp.source}</span>
+              <span className="font-mono text-xs text-ink-soft">{opp.source}</span>
             )}
-            <span className="text-mono text-ink-soft">
+            <span className="font-mono text-xs text-ink-soft">
               {temperatureLabel(opp.temperature)}
             </span>
           </div>
-        </Block>
+        </Row>
 
-        <Block label="Timeline">
+        <Row label="Timeline">
           <ol className="space-y-2">
             {opp.timeline.map((event) => (
               <li key={event.id} className="flex gap-2">
                 <span
                   className={cn(
-                    "mt-1.5 h-1 w-1 shrink-0 rounded-full",
+                    "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
                     event.done ? "bg-success" : "bg-border",
                   )}
                   aria-hidden
@@ -131,37 +125,39 @@ export function ContextPanel({
                 <div className="min-w-0">
                   <p
                     className={cn(
-                      "text-[12px] leading-4",
+                      "text-xs",
                       event.done ? "text-ink" : "text-ink-soft",
                     )}
                   >
                     {event.label}
                   </p>
-                  <p className="text-mono text-ink-soft">{event.timestamp}</p>
+                  <p className="font-mono text-[10px] text-ink-soft">
+                    {event.timestamp}
+                  </p>
                 </div>
               </li>
             ))}
           </ol>
-        </Block>
+        </Row>
 
-        <Block label="Dados do lead">
-          <p className="text-[13px] text-ink">{opp.leadName}</p>
-          <p className="text-[12px] text-ink-soft">{opp.company}</p>
+        <Row label="Dados do lead">
+          <p className="text-sm text-ink">{opp.leadName}</p>
+          <p className="text-xs text-ink-soft">{opp.company}</p>
           {opp.phone && (
-            <p className="mt-1 text-mono text-ink-soft">{opp.phone}</p>
+            <p className="mt-1 font-mono text-xs text-ink-soft">{opp.phone}</p>
           )}
-          {opp.email && <p className="text-mono text-ink-soft">{opp.email}</p>}
-        </Block>
+          {opp.email && (
+            <p className="font-mono text-xs text-ink-soft">{opp.email}</p>
+          )}
+        </Row>
 
         {opp.meeting && (
-          <Block label="Reunião">
-            <p className="text-[13px] text-ink">
-              {opp.meeting.title || "Reunião"}
-            </p>
-            <p className="text-mono text-ink-soft">
+          <Row label="Reunião">
+            <p className="text-sm text-ink">{opp.meeting.title || "Reunião"}</p>
+            <p className="font-mono text-xs text-ink-soft">
               {opp.meeting.date} · {opp.meeting.time}
             </p>
-          </Block>
+          </Row>
         )}
       </div>
 
@@ -169,7 +165,7 @@ export function ContextPanel({
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 w-full justify-start text-[12px]"
+          className="h-8 w-full justify-start text-xs"
         >
           Abrir lead
         </Button>
