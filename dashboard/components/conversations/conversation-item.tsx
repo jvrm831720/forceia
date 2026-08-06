@@ -28,14 +28,24 @@ export function ConversationItem({
       onClick={() => onSelect(conversation.id)}
       aria-current={selected ? "true" : undefined}
       className={cn(
-        "grid w-full grid-cols-[28px_1fr_auto] gap-x-2 border-b border-border px-3 py-2 text-left transition-colors duration-100",
-        selected ? "bg-elevated" : "hover:bg-surface",
-        needsYou && !selected && "bg-warning-soft/30",
+        "group relative flex h-11 w-full items-center gap-2 border-b border-border px-3 text-left transition-colors duration-100",
+        selected ? "bg-surface" : "hover:bg-surface/60",
+        needsYou && !selected && "bg-warning-soft/20",
       )}
     >
       <span
         className={cn(
-          "pt-0.5 text-mono font-medium tabular-nums",
+          "absolute left-0 top-0 h-full w-0.5",
+          selected && "bg-ink",
+          needsYou && !selected && "bg-warning",
+          !selected && !needsYou && "bg-transparent group-hover:bg-border",
+        )}
+        aria-hidden
+      />
+
+      <span
+        className={cn(
+          "w-7 shrink-0 text-mono font-medium tabular-nums",
           code === "HO" && "text-warning",
           code === "AI" && "text-ink-muted",
           code === "HUM" && "text-ink-soft",
@@ -45,36 +55,37 @@ export function ConversationItem({
         {code}
       </span>
 
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-1.5">
           <span
             className={cn(
-              "truncate text-[13px] leading-4 text-ink",
+              "truncate text-[13px] font-medium leading-4 text-ink",
               unread && "font-medium",
             )}
           >
             {conversation.leadName}
           </span>
           {unread && (
-            <span className="shrink-0 text-mono text-brand">
+            <span className="shrink-0 text-mono text-brand tabular-nums">
               {conversation.unreadCount}
             </span>
           )}
         </div>
         <p className="truncate text-[12px] leading-4 text-ink-soft">
           {conversation.company}
-        </p>
-        <p className="mt-0.5 truncate text-[12px] leading-4 text-ink-soft">
+          <span className="text-ink-soft/60"> · </span>
           {conversation.lastMessage}
-        </p>
-        <p className="mt-0.5 text-[11px] leading-4 text-ink-soft">
-          {agentLabel(conversation.currentOwner)}
         </p>
       </div>
 
-      <time className="pt-0.5 text-right text-mono text-ink-soft">
-        {formatMessageTime(conversation.lastMessageAt)}
-      </time>
+      <div className="flex shrink-0 flex-col items-end gap-0.5">
+        <time className="text-mono text-ink-soft">
+          {formatMessageTime(conversation.lastMessageAt)}
+        </time>
+        <span className="text-[10px] leading-3 text-ink-soft">
+          {agentLabel(conversation.currentOwner)}
+        </span>
+      </div>
     </button>
   );
 }
