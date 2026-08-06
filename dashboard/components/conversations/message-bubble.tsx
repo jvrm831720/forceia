@@ -4,16 +4,16 @@ import { cn } from "@/lib/utils";
 import { agentLabel, formatMessageTime } from "@/lib/conversation-utils";
 import type { ConversationMessage } from "@/types/conversation";
 
-/** Operational timeline event — not a chat bubble. */
+/** Midday details body rhythm. ForceIA operational event rows. */
 export function MessageBubble({ message }: { message: ConversationMessage }) {
   const { sender, content, timestamp, agentRole, systemKind, status } = message;
 
   if (sender === "system") {
     return (
-      <div className="border-b border-border px-4 py-2">
-        <p className="text-center text-[11px] leading-4 text-ink-soft">
+      <div className="border-b border-border px-4 py-3">
+        <p className="text-center text-xs text-ink-soft">
           {content}
-          <span className="ml-2 text-mono">
+          <span className="ml-2 font-mono">
             {formatMessageTime(timestamp)}
             {systemKind ? ` · ${systemKind}` : ""}
           </span>
@@ -45,26 +45,11 @@ export function MessageBubble({ message }: { message: ConversationMessage }) {
           : "IA";
 
   return (
-    <article
-      className={cn(
-        "relative border-b border-border px-4 py-2.5",
-        sender === "ai" && "bg-surface/30",
-      )}
-    >
-      <span
-        className={cn(
-          "absolute left-0 top-0 h-full w-0.5",
-          sender === "ai" && "bg-brand/40",
-          sender === "lead" && "bg-border",
-          sender === "human" && "bg-ink-soft/40",
-        )}
-        aria-hidden
-      />
-
-      <div className="mb-1 flex items-baseline gap-2">
+    <article className="border-b border-border px-4 py-3">
+      <div className="mb-1.5 flex items-center gap-2">
         <span
           className={cn(
-            "text-mono font-medium tabular-nums",
+            "font-mono text-xs font-medium tabular-nums",
             sender === "ai" && "text-brand",
             sender === "lead" && "text-ink-muted",
             sender === "human" && "text-ink",
@@ -72,16 +57,15 @@ export function MessageBubble({ message }: { message: ConversationMessage }) {
         >
           {code}
         </span>
-        <time className="text-mono text-ink-soft">
+        <span className="text-xs text-ink-soft">{origin}</span>
+        <time className="ml-auto font-mono text-xs text-ink-soft">
           {formatMessageTime(timestamp)}
         </time>
-        <span className="text-[11px] text-ink-soft">{origin}</span>
         {status && status !== "sent" && (
-          <span className="ml-auto text-mono text-ink-soft">{status}</span>
+          <span className="font-mono text-xs text-ink-soft">{status}</span>
         )}
       </div>
-
-      <p className="whitespace-pre-wrap text-[13px] leading-5 text-ink">
+      <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink">
         {content}
       </p>
     </article>

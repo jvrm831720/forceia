@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import type { HandoffRequest } from "@/types/conversation";
 
-/** Compact operational interrupt lane. */
+/** Midday detail alert strip — compact, bordered, action row. */
 export function HandoffCard({
   handoff,
   onAssume,
@@ -20,32 +20,25 @@ export function HandoffCard({
 
   return (
     <div
-      className="relative border-b border-border bg-warning-soft/15 px-4 py-2.5"
+      className="border-b border-warning/40 bg-warning-soft/15 px-4 py-3"
       role="region"
       aria-label="Precisa de você"
     >
-      <span
-        className="absolute left-0 top-0 h-full w-0.5 bg-warning"
-        aria-hidden
-      />
-
       <div className="mb-1 flex items-center gap-2">
-        <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-warning">
+        <span className="text-xs font-semibold uppercase tracking-wide text-warning">
           Precisa de você
         </span>
-        <span className="text-mono font-medium text-warning">HO</span>
-        <span className="ml-auto text-mono text-ink-soft">{time}</span>
+        <span className="font-mono text-xs font-medium text-warning">HO</span>
+        <span className="ml-auto font-mono text-xs text-ink-soft">{time}</span>
       </div>
-
-      <p className="text-[13px] leading-5 text-ink">{handoff.reason}</p>
-
-      <div className="mt-2 flex items-center gap-2">
+      <p className="text-sm text-ink">{handoff.reason}</p>
+      <div className="mt-2.5 flex items-center gap-2">
         <Button
           type="button"
           size="sm"
           variant="secondary"
           onClick={onAssume}
-          className="h-7 px-2.5 text-[12px]"
+          className="h-8 text-xs"
         >
           Assumir
         </Button>
@@ -54,7 +47,7 @@ export function HandoffCard({
           size="sm"
           variant="ghost"
           onClick={onDismiss}
-          className="h-7 px-2.5 text-[12px]"
+          className="h-8 text-xs"
         >
           Manter com a IA
         </Button>
