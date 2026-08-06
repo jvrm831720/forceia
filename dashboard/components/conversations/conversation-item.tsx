@@ -5,10 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import {
   agentBadgeVariant,
   agentLabel,
-  channelLabel,
   formatMessageTime,
+  statusCode,
 } from "@/lib/conversation-utils";
 import type { Conversation } from "@/types/conversation";
+
+const CODE_COLOR: Record<string, string> = {
+  AI: "text-brand",
+  HO: "text-warning",
+  HUM: "text-ink-muted",
+  DONE: "text-ink-soft",
+};
 
 export function ConversationItem({
   conversation,
@@ -23,14 +30,15 @@ export function ConversationItem({
     id,
     leadName,
     company,
-    avatarInitials,
     lastMessage,
     lastMessageAt,
-    channel,
     currentOwner,
     status,
     unreadCount,
   } = conversation;
+
+  const code = statusCode(status);
+  const needsYou = status === "needs_attention";
 
   return (
     <button
@@ -38,49 +46,43 @@ export function ConversationItem({
       onClick={() => onSelect(id)}
       aria-current={selected ? "true" : undefined}
       className={cn(
-        "group flex w-full gap-3 rounded-xl px-3 py-3 text-left transition duration-200",
+        "group relative flex w-full gap-2.5 border-l-2 px-3 py-2.5 text-left transition-ui duration-fast",
         selected
-          ? "bg-brand-soft shadow-card"
-          : "hover:bg-border-soft"
+          ? "border-l-brand bg-surface"
+          : needsYou
+            ? "border-l-warning hover:bg-surface"
+            : "border-l-transparent hover:bg-surface",
       )}
     >
-      <div className="relative shrink-0">
-        <div
-          className={cn(
-            "flex h-10 w-10 items-center justify-center rounded-full font-display text-xs font-bold",
-            selected ? "bg-brand text-white" : "bg-border-soft text-ink-muted"
-          )}
-        >
-          {avatarInitials}
-        </div>
-        {status === "needs_attention" && (
-          <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-alert" />
-        )}
-      </div>
-
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-ink">{leadName}</p>
-            <p className="truncate text-[12px] text-ink-soft">{company}</p>
+            <p className="truncate text-body font-medium text-ink">{leadName}</p>
+            <p className="truncate text-meta text-ink-soft">{company}</p>
           </div>
-          <span className="shrink-0 text-[11px] text-ink-soft">
-            {formatMessageTime(lastMessageAt)}
-          </span>
+          <div className="flex shrink-0 flex-col items-end gap-0.5">
+            <time className="text-mono text-ink-soft">
+              {formatMessageTime(lastMessageAt)}
+            </time>
+            {typeof unreadCount === "number" && unreadCount > 0 && (
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-sm bg-brand px-1 text-mono text-white">
+                {unreadCount}
+              </span>
+            )}
+          </div>
         </div>
 
-        <p className="mt-1 truncate text-[12.5px] text-ink-muted">{lastMessage}</p>
+        <p className="mt-1 line-clamp-1 text-meta text-ink-muted">{lastMessage}</p>
 
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <Badge variant={agentBadgeVariant(currentOwner)} className="!py-0 !text-[10px]">
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span className={cn("text-mono font-medium", CODE_COLOR[code] ?? "text-ink-soft")}>
+            {code}
+          </span>
+          <span className="text-mono text-ink-soft">·</span>
+          <Badge variant={agentBadgeVariant(currentOwner)}>
             {agentLabel(currentOwner)}
           </Badge>
-          <span className="text-[10px] text-ink-soft">{channelLabel(channel)}</span>
-          {typeof unreadCount === "number" && unreadCount > 0 && (
-            <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-[10px] font-bold text-white">
-              {unreadCount}
-            </span>
-          )}
+          {needsYou && <Badge variant="warning">handoff</Badge>}
         </div>
       </div>
     </button>

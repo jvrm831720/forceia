@@ -4,11 +4,11 @@ import { cn } from "@/lib/utils";
 import type { ConversationFilter } from "@/types/conversation";
 
 const FILTERS: { id: ConversationFilter; label: string }[] = [
-  { id: "all", label: "Todos" },
-  { id: "ai", label: "IA Atendendo" },
-  { id: "attention", label: "Atenção" },
+  { id: "all", label: "Todas" },
+  { id: "ai", label: "Em operação" },
+  { id: "attention", label: "Precisa de você" },
   { id: "human", label: "Humano" },
-  { id: "closed", label: "Finalizadas" },
+  { id: "closed", label: "Resolvidas" },
 ];
 
 export function ConversationFilters({
@@ -17,18 +17,13 @@ export function ConversationFilters({
   counts,
 }: {
   value: ConversationFilter;
-  onChange: (filter: ConversationFilter) => void;
+  onChange: (f: ConversationFilter) => void;
   counts: Record<ConversationFilter, number>;
 }) {
   return (
-    <div
-      className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none"
-      role="tablist"
-      aria-label="Filtros de conversas"
-    >
+    <div className="flex flex-wrap gap-1" role="tablist" aria-label="Filtros de conversa">
       {FILTERS.map((f) => {
         const active = value === f.id;
-        const count = counts[f.id];
         return (
           <button
             key={f.id}
@@ -37,23 +32,14 @@ export function ConversationFilters({
             aria-selected={active}
             onClick={() => onChange(f.id)}
             className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition duration-200",
+              "inline-flex items-center gap-1 rounded-sm border px-2 py-1 text-meta transition-ui duration-fast",
               active
-                ? "bg-brand text-white shadow-card"
-                : "bg-white text-ink-muted border border-border hover:text-ink hover:bg-border-soft"
+                ? "border-border bg-elevated text-ink"
+                : "border-transparent text-ink-soft hover:bg-surface hover:text-ink-muted",
             )}
           >
             {f.label}
-            {count > 0 && (
-              <span
-                className={cn(
-                  "inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold",
-                  active ? "bg-white/25 text-white" : "bg-border-soft text-ink-muted"
-                )}
-              >
-                {count}
-              </span>
-            )}
+            <span className="text-mono text-ink-soft">{counts[f.id] ?? 0}</span>
           </button>
         );
       })}
