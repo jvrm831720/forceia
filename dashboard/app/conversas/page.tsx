@@ -10,13 +10,13 @@ export default async function ConversasPage() {
     <div className="flex min-h-screen bg-background">
       <Sidebar />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <Header
           workspace={data.workspace}
           notificationsCount={data.notificationsCount}
         />
 
-        <main className="min-h-0 flex-1">
+        <main className="flex min-h-0 flex-1 flex-col">
           <ConversationsShell data={data} />
         </main>
       </div>
