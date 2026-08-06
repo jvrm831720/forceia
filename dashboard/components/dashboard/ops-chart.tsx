@@ -40,22 +40,23 @@ function toArea(values: number[], w: number, h: number, pad = 12): string {
 
 export function OpsChart() {
   const W = 720;
-  const H = 220;
+  const H = 200;
   const pad = 12;
   const activeIdx = 6;
 
   return (
     <section className="border border-border bg-canvas">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
-        <div>
-          <h2 className="text-[13px] font-medium text-ink">Evolução operacional</h2>
-          <p className="text-[11px] text-ink-soft">
-            7 dias · leads · qualificados · reuniões · pipeline
-          </p>
+      <div className="flex h-9 flex-wrap items-center justify-between gap-2 border-b border-border px-3">
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-section text-ink">Evolução operacional</h2>
+          <span className="text-meta text-ink-soft">7 dias</span>
         </div>
-        <ul className="flex flex-wrap items-center gap-x-3 gap-y-1" aria-label="Legenda do gráfico">
+        <ul
+          className="flex flex-wrap items-center gap-x-3 gap-y-1"
+          aria-label="Legenda do gráfico"
+        >
           {LEGEND.map((l) => (
-            <li key={l.key} className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+            <li key={l.key} className="flex items-center gap-1.5 text-meta text-ink-muted">
               <span
                 className="inline-block h-0.5 w-3"
                 style={{
@@ -72,10 +73,10 @@ export function OpsChart() {
         </ul>
       </div>
 
-      <div className="relative px-2 pb-2 pt-3 sm:px-3">
+      <div className="relative px-2 pb-2 pt-2 sm:px-3">
         <svg
           viewBox={`0 0 ${W} ${H}`}
-          className="h-[190px] w-full sm:h-[210px]"
+          className="h-[168px] w-full sm:h-[184px]"
           role="img"
           aria-label="Gráfico de evolução: pipeline em área, leads e qualificados em linha, reuniões em linha tracejada"
         >
@@ -119,29 +120,9 @@ export function OpsChart() {
             strokeLinejoin="round"
             strokeLinecap="round"
           />
-
-          <path
-            d={toPath(SERIES.leads, W, H, pad)}
-            fill="none"
-            stroke="#A7A7A7"
-            strokeWidth={1.25}
-            strokeLinejoin="round"
-          />
-          <path
-            d={toPath(SERIES.qualified, W, H, pad)}
-            fill="none"
-            stroke="#0DA387"
-            strokeWidth={1.25}
-            strokeLinejoin="round"
-          />
-          <path
-            d={toPath(SERIES.meetings, W, H, pad)}
-            fill="none"
-            stroke="#9B95FE"
-            strokeWidth={1.25}
-            strokeDasharray="4 3"
-            strokeLinejoin="round"
-          />
+          <path d={toPath(SERIES.leads, W, H, pad)} fill="none" stroke="#A7A7A7" strokeWidth={1.25} strokeLinejoin="round" />
+          <path d={toPath(SERIES.qualified, W, H, pad)} fill="none" stroke="#0DA387" strokeWidth={1.25} strokeLinejoin="round" />
+          <path d={toPath(SERIES.meetings, W, H, pad)} fill="none" stroke="#9B95FE" strokeWidth={1.25} strokeDasharray="4 3" strokeLinejoin="round" />
 
           {([
             ["pipeline", SERIES.pipeline, "#05B5DB"],
@@ -152,9 +133,7 @@ export function OpsChart() {
             const step = (W - pad * 2) / (vals.length - 1);
             const x = pad + (vals.length - 1) * step;
             const y = H - pad - vals[vals.length - 1] * (H - pad * 2 - 14);
-            return (
-              <circle key={key} cx={x} cy={y} r={2.5} fill={color} />
-            );
+            return <circle key={key} cx={x} cy={y} r={2.5} fill={color} />;
           })}
 
           {DAYS.map((d, i) => {
