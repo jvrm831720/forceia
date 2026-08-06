@@ -12,14 +12,20 @@ import { ContextPanel } from "./context-panel";
 
 type MobilePane = "list" | "thread" | "context";
 
+/**
+ * Midday inbox-view architecture:
+ * flex flex-row space-x-8
+ * Left: list (flex-1)
+ * Right: detail panel (fixed ~614px, border, full height)
+ */
 export function ConversationsShell({ data }: { data: ConversationsData }) {
   const [conversations, setConversations] = useState<Conversation[]>(
-    data.conversations
+    data.conversations,
   );
   const [selectedId, setSelectedId] = useState<string | null>(
     data.conversations.find((c) => c.status === "needs_attention")?.id ??
       data.conversations[0]?.id ??
-      null
+      null,
   );
   const [filter, setFilter] = useState<ConversationFilter>("all");
   const [search, setSearch] = useState("");
@@ -27,16 +33,16 @@ export function ConversationsShell({ data }: { data: ConversationsData }) {
 
   const selected = useMemo(
     () => conversations.find((c) => c.id === selectedId) ?? null,
-    [conversations, selectedId]
+    [conversations, selectedId],
   );
 
   const updateConversation = useCallback(
     (id: string, updater: (c: Conversation) => Conversation) => {
       setConversations((prev) =>
-        prev.map((c) => (c.id === id ? updater(c) : c))
+        prev.map((c) => (c.id === id ? updater(c) : c)),
       );
     },
-    []
+    [],
   );
 
   const handleSelect = (id: string) => {
@@ -50,9 +56,7 @@ export function ConversationsShell({ data }: { data: ConversationsData }) {
       ...c,
       status: "human",
       currentOwner: "human",
-      handoff: c.handoff
-        ? { ...c.handoff, dismissed: true }
-        : undefined,
+      handoff: c.handoff ? { ...c.handoff, dismissed: true } : undefined,
       messages: [
         ...c.messages,
         {
@@ -116,37 +120,35 @@ export function ConversationsShell({ data }: { data: ConversationsData }) {
 
   const handleSend = (text: string) => {
     if (!selectedId) return;
-    updateConversation(selectedId, (c) => {
-      return {
-        ...c,
-        status: "human",
-        currentOwner: "human",
-        lastMessage: text,
-        lastMessageAt: new Date().toISOString(),
-        messages: [
-          ...c.messages,
-          ...(c.currentOwner !== "human"
-            ? [
-                {
-                  id: `sys-${Date.now()}`,
-                  sender: "system" as const,
-                  content: "Humano assumiu a conversa.",
-                  timestamp: new Date().toISOString(),
-                  systemKind: "assumed" as const,
-                },
-              ]
-            : []),
-          {
-            id: `msg-${Date.now()}`,
-            sender: "human" as const,
-            content: text,
-            timestamp: new Date().toISOString(),
-            status: "sent" as const,
-          },
-        ],
-        opportunity: { ...c.opportunity, currentOwner: "human" },
-      };
-    });
+    updateConversation(selectedId, (c) => ({
+      ...c,
+      status: "human",
+      currentOwner: "human",
+      lastMessage: text,
+      lastMessageAt: new Date().toISOString(),
+      messages: [
+        ...c.messages,
+        ...(c.currentOwner !== "human"
+          ? [
+              {
+                id: `sys-${Date.now()}`,
+                sender: "system" as const,
+                content: "Humano assumiu a conversa.",
+                timestamp: new Date().toISOString(),
+                systemKind: "assumed" as const,
+              },
+            ]
+          : []),
+        {
+          id: `msg-${Date.now()}`,
+          sender: "human" as const,
+          content: text,
+          timestamp: new Date().toISOString(),
+          status: "sent" as const,
+        },
+      ],
+      opportunity: { ...c.opportunity, currentOwner: "human" },
+    }));
   };
 
   const handleAddNote = () => {
@@ -167,53 +169,55 @@ export function ConversationsShell({ data }: { data: ConversationsData }) {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden border-t border-border bg-background">
-      {/* Column 1 — List */}
-      <div
-        className={`${
-          mobilePane === "list" ? "flex" : "hidden"
-        } w-full shrink-0 flex-col md:flex md:w-[300px] lg:w-[320px]`}
-      >
-        <ConversationList
-          conversations={conversations}
-          selectedId={selectedId}
-          filter={filter}
-          search={search}
-          onFilterChange={setFilter}
-          onSearchChange={setSearch}
-          onSelect={handleSelect}
-        />
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-6 pt-2">
+      <div className="flex min-h-0 flex-1 flex-row space-x-8">
+        <div
+          className={`${
+            mobilePane === "list" ? "flex" : "hidden"
+          } min-w-0 flex-1 flex-col md:flex`}
+        >
+          <ConversationList
+            conversations={conversations}
+            selectedId={selectedId}
+            filter={filter}
+            search={search}
+            onFilterChange={setFilter}
+            onSearchChange={setSearch}
+            onSelect={handleSelect}
+          />
+        </div>
 
-      {/* Column 2 — Thread */}
-      <div
-        className={`${
-          mobilePane === "thread" ? "flex" : "hidden"
-        } min-h-0 min-w-0 flex-1 flex-col md:flex`}
-      >
-        <ConversationView
-          conversation={selected}
-          onBack={() => setMobilePane("list")}
-          onAssume={handleAssume}
-          onReturnToAi={handleReturnToAi}
-          onResolve={handleResolve}
-          onAddNote={handleAddNote}
-          onOpenLead={() => setMobilePane("context")}
-          onDismissHandoff={handleDismissHandoff}
-          onSend={handleSend}
-        />
-      </div>
-
-      {/* Column 3 — Context / Decision */}
-      <div
-        className={`${
-          mobilePane === "context" ? "flex" : "hidden"
-        } min-h-0 w-full xl:flex xl:w-auto`}
-      >
-        <ContextPanel
-          conversation={selected}
-          onClose={() => setMobilePane("thread")}
-        />
+        <div
+          className={`${
+            mobilePane === "thread" || mobilePane === "context"
+              ? "flex"
+              : "hidden"
+          } h-[calc(100vh-125px)] min-w-0 flex-1 flex-col border border-border md:flex md:w-[614px] md:shrink-0 xl:w-auto xl:min-w-[640px] xl:flex-1`}
+        >
+          <ConversationView
+            conversation={selected}
+            onBack={() => setMobilePane("list")}
+            onAssume={handleAssume}
+            onReturnToAi={handleReturnToAi}
+            onResolve={handleResolve}
+            onAddNote={handleAddNote}
+            onOpenLead={() => setMobilePane("context")}
+            onDismissHandoff={handleDismissHandoff}
+            onSend={handleSend}
+            contextSlot={
+              <div
+                className={`${
+                  mobilePane === "context" ? "flex" : "hidden"
+                } xl:flex`}
+              >
+                <ContextPanel
+                  conversation={selected}
+                  onClose={() => setMobilePane("thread")}
+                />
+              </div>
+            }
+          />
+        </div>
       </div>
     </div>
   );
