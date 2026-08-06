@@ -37,13 +37,27 @@ export function agentBadgeVariant(
 export function statusLabel(status: ConversationStatus): string {
   switch (status) {
     case "ai_handling":
-      return "IA atendendo";
+      return "Em operação";
     case "needs_attention":
-      return "Precisa de atenção";
+      return "Precisa de você";
     case "human":
-      return "Humano";
+      return "Cobertura humana";
     case "closed":
-      return "Finalizada";
+      return "Resolvida";
+  }
+}
+
+/** Código operacional mono (Product Language). */
+export function statusCode(status: ConversationStatus): string {
+  switch (status) {
+    case "ai_handling":
+      return "AI";
+    case "needs_attention":
+      return "HO";
+    case "human":
+      return "HUM";
+    case "closed":
+      return "DONE";
   }
 }
 
@@ -58,11 +72,6 @@ export function channelLabel(channel: Conversation["channel"]): string {
   }
 }
 
-/**
- * Formata horário/data para lista e balões.
- * Hoje → HH:mm · Ontem → "Ontem" · demais → data curta (pt-BR).
- * Datas inválidas retornam string vazia.
- */
 export function formatMessageTime(iso: string): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -96,7 +105,6 @@ export function formatMessageTime(iso: string): string {
   });
 }
 
-/** Alias usado pela lista de conversas (mesmo comportamento de formatMessageTime). */
 export function formatListTime(iso: string): string {
   return formatMessageTime(iso);
 }
@@ -112,10 +120,6 @@ export function dateKey(iso: string): string {
   });
 }
 
-/**
- * Alinhamento semântico do balão conforme o remetente.
- * lead → left | ai/human → right | system → center
- */
 export function senderBubbleAlign(
   sender: MessageSender
 ): "left" | "right" | "center" {
