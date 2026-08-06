@@ -19,7 +19,7 @@ export function ConversationsError({
           type="button"
           variant="secondary"
           size="sm"
-          className="mt-3 h-7"
+          className="mt-3 h-7 text-[12px]"
           onClick={onRetry}
         >
           Tentar de novo
