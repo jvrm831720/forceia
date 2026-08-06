@@ -1,22 +1,25 @@
 "use client";
 
-import {
-  ArrowLeft,
-  MoreHorizontal,
-  StickyNote,
-  UserCheck,
-  Bot,
-  CheckCircle2,
-  ExternalLink,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Icon } from "@/components/ui/icon";
 import {
   agentBadgeVariant,
   agentLabel,
   channelLabel,
+  statusCode,
+  statusLabel,
 } from "@/lib/conversation-utils";
 import type { Conversation } from "@/types/conversation";
+import {
+  ArrowLeft,
+  Bot,
+  CheckCircle2,
+  ExternalLink,
+  StickyNote,
+  UserCheck,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function ConversationHeader({
   conversation,
@@ -35,45 +38,52 @@ export function ConversationHeader({
   onAddNote: () => void;
   onOpenLead: () => void;
 }) {
-  const isHuman = conversation.currentOwner === "human";
   const isClosed = conversation.status === "closed";
+  const isHuman = conversation.currentOwner === "human";
+  const needsYou = conversation.status === "needs_attention";
+  const code = statusCode(conversation.status);
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-surface-card px-3 sm:px-4">
-      {onBack && (
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-white text-ink-muted lg:hidden"
-          aria-label="Voltar para lista"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-      )}
-
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-border-soft font-display text-xs font-bold text-ink-muted">
-          {conversation.avatarInitials}
-        </div>
+    <header className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border bg-canvas px-2 sm:px-3">
+      <div className="flex min-w-0 items-center gap-2">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-soft transition-ui duration-fast hover:bg-surface hover:text-ink md:hidden"
+            aria-label="Voltar para lista"
+          >
+            <Icon icon={ArrowLeft} size="sm" />
+          </button>
+        )}
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-semibold text-ink">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="truncate text-section text-ink">
               {conversation.leadName}
             </p>
+            <span
+              className={cn(
+                "text-mono font-medium",
+                needsYou ? "text-warning" : "text-brand",
+              )}
+            >
+              {code}
+            </span>
             <Badge
               variant={agentBadgeVariant(conversation.currentOwner)}
-              className="!py-0 !text-[10px] hidden sm:inline-flex"
+              className="hidden sm:inline-flex"
             >
               {agentLabel(conversation.currentOwner)}
             </Badge>
           </div>
-          <p className="truncate text-[12px] text-ink-soft">
-            {conversation.company} · {channelLabel(conversation.channel)}
+          <p className="truncate text-meta text-ink-soft">
+            {conversation.company} · {channelLabel(conversation.channel)} ·{" "}
+            {statusLabel(conversation.status)}
           </p>
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1">
         {!isClosed && (
           <>
             {isHuman ? (
@@ -83,7 +93,7 @@ export function ConversationHeader({
                 onClick={onReturnToAi}
                 className="hidden sm:inline-flex"
               >
-                <Bot className="h-3.5 w-3.5" />
+                <Icon icon={Bot} size="sm" />
                 Devolver para IA
               </Button>
             ) : (
@@ -93,7 +103,7 @@ export function ConversationHeader({
                 onClick={onAssume}
                 className="hidden sm:inline-flex"
               >
-                <UserCheck className="h-3.5 w-3.5" />
+                <Icon icon={UserCheck} size="sm" />
                 Assumir
               </Button>
             )}
@@ -104,7 +114,7 @@ export function ConversationHeader({
               aria-label="Adicionar nota"
               className="hidden md:inline-flex"
             >
-              <StickyNote className="h-4 w-4" />
+              <Icon icon={StickyNote} size="sm" />
             </Button>
             <Button
               size="sm"
@@ -113,7 +123,7 @@ export function ConversationHeader({
               aria-label="Marcar como resolvida"
               className="hidden md:inline-flex"
             >
-              <CheckCircle2 className="h-4 w-4" />
+              <Icon icon={CheckCircle2} size="sm" />
             </Button>
           </>
         )}
@@ -123,10 +133,7 @@ export function ConversationHeader({
           onClick={onOpenLead}
           aria-label="Abrir lead"
         >
-          <ExternalLink className="h-4 w-4" />
-        </Button>
-        <Button size="sm" variant="ghost" aria-label="Mais opções">
-          <MoreHorizontal className="h-4 w-4" />
+          <Icon icon={ExternalLink} size="sm" />
         </Button>
       </div>
     </header>

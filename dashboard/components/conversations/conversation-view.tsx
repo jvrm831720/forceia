@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import type { Conversation } from "@/types/conversation";
-import { dateKey } from "@/lib/conversation-utils";
+import { agentLabel } from "@/lib/conversation-utils";
 import { ConversationHeader } from "./conversation-header";
 import { ConversationInput } from "./conversation-input";
-import { MessageBubble } from "./message-bubble";
 import { HandoffCard } from "./handoff-card";
+import { MessageBubble } from "./message-bubble";
 import { TypingIndicator } from "./typing-indicator";
-import { ConversationsEmptyState } from "./empty-state";
 
 export function ConversationView({
   conversation,
@@ -31,30 +29,36 @@ export function ConversationView({
   onDismissHandoff: () => void;
   onSend: (text: string) => void;
 }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversation?.id, conversation?.messages.length, conversation?.isTyping]);
-
   if (!conversation) {
     return (
-      <div className="flex h-full flex-col items-center justify-center bg-surface">
-        <ConversationsEmptyState
-          title="Selecione uma conversa"
-          description="Escolha um atendimento na lista para acompanhar o time de IA em tempo real."
-        />
+      <div className="flex h-full flex-col items-center justify-center border-r border-border bg-canvas px-6 text-center">
+        <p className="text-section text-ink">Nenhuma conversa selecionada</p>
+        <p className="mt-1 max-w-xs text-body-muted text-ink-soft">
+          Selecione uma conversa na lista para acompanhar a operação.
+        </p>
       </div>
     );
   }
 
   const isClosed = conversation.status === "closed";
-  const messages = conversation.messages;
+  const showHandoff =
+    conversation.handoff &&
+    !conversation.handoff.dismissed &&
+    conversation.status === "needs_attention";
 
-  let lastDate = "";
+  const typingLabel =
+    conversation.isTyping === "ai"
+      ? `${agentLabel(
+          conversation.currentOwner === "human"
+            ? "sdr"
+            : conversation.currentOwner,
+        )} respondendo…`
+      : conversation.isTyping === "lead"
+        ? "Lead digitando…"
+        : null;
 
   return (
-    <div className="flex h-full flex-col bg-surface">
+    <div className="flex h-full min-w-0 flex-1 flex-col border-r border-border bg-canvas">
       <ConversationHeader
         conversation={conversation}
         onBack={onBack}
@@ -65,55 +69,43 @@ export function ConversationView({
         onOpenLead={onOpenLead}
       />
 
-      {conversation.handoff && !conversation.handoff.dismissed && (
-        <div className="pt-3">
-          <HandoffCard
-            handoff={conversation.handoff}
-            onAssume={onAssume}
-            onDismiss={onDismissHandoff}
-          />
-        </div>
+      {showHandoff && conversation.handoff && (
+        <HandoffCard
+          handoff={conversation.handoff}
+          onAssume={onAssume}
+          onDismiss={onDismissHandoff}
+        />
       )}
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-        <div className="mx-auto flex max-w-2xl flex-col gap-3">
-          {messages.map((msg) => {
-            const dk = dateKey(msg.timestamp);
-            const showSeparator = dk !== lastDate;
-            lastDate = dk;
-
-            return (
-              <div key={msg.id}>
-                {showSeparator && (
-                  <div className="my-3 flex justify-center">
-                    <span className="rounded-full bg-border-soft px-3 py-1 text-[11px] font-medium capitalize text-ink-soft">
-                      {dk}
-                    </span>
-                  </div>
-                )}
-                <MessageBubble message={msg} />
-              </div>
-            );
-          })}
-
-          {conversation.isTyping === "ai" && (
-            <TypingIndicator label="IA digitando" align="right" />
-          )}
-          {conversation.isTyping === "lead" && (
-            <TypingIndicator label="Cliente digitando" align="left" />
-          )}
-
-          <div ref={bottomRef} />
-        </div>
+      <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto py-2">
+        {conversation.messages.length === 0 ? (
+          <div className="flex h-full items-center justify-center px-6 text-center">
+            <p className="text-body-muted text-ink-soft">
+              Nenhuma mensagem ainda. Aguardando atividade.
+            </p>
+          </div>
+        ) : (
+          conversation.messages.map((m) => (
+            <MessageBubble key={m.id} message={m} />
+          ))
+        )}
+        {typingLabel && (
+          <TypingIndicator
+            label={typingLabel}
+            align={conversation.isTyping === "ai" ? "right" : "left"}
+          />
+        )}
       </div>
 
       <ConversationInput
-        disabled={isClosed}
         onSend={onSend}
+        disabled={isClosed}
         placeholder={
-          conversation.currentOwner === "human"
-            ? "Responder como humano…"
-            : "Assuma a conversa para responder…"
+          isClosed
+            ? "Conversa resolvida"
+            : conversation.currentOwner === "human"
+              ? "Escrever como humano…"
+              : "Assuma para enviar, ou aguarde a IA"
         }
       />
     </div>
