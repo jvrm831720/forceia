@@ -15,3 +15,25 @@ docker/data/
 dist/
 build/
 *.egg-info/
+
+# ForceIA client — WaCRM foundation
+apps/client/node_modules/
+apps/client/.next/
+apps/client/.vercel/
+apps/client/coverage/
+apps/client/.env
+apps/client/.env.local
+apps/client/.env.development.local
+apps/client/.env.test.local
+apps/client/.env.production.local
+
+# ForceIA client — WaCRM foundation
+apps/client/node_modules/
+apps/client/.next/
+apps/client/.vercel/
+apps/client/coverage/
+apps/client/.env
+apps/client/.env.local
+apps/client/.env.development.local
+apps/client/.env.test.local
+apps/client/.env.production.local
