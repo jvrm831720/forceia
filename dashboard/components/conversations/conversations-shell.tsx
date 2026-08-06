@@ -109,6 +109,8 @@ export function ConversationsShell({ data }: { data: ConversationsData }) {
     if (!selectedId) return;
     updateConversation(selectedId, (c) => ({
       ...c,
+      // "Manter com a IA" — handoff dismissed, operation continues under AI
+      status: "ai_handling",
       handoff: c.handoff ? { ...c.handoff, dismissed: true } : undefined,
     }));
   };
@@ -166,7 +168,7 @@ export function ConversationsShell({ data }: { data: ConversationsData }) {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] min-h-0 overflow-hidden rounded-none border-t border-border bg-surface lg:rounded-tl-2xl">
+    <div className="flex min-h-0 flex-1 overflow-hidden border-t border-border bg-canvas">
       {/* Column 1 — List */}
       <div
         className={`${
@@ -188,7 +190,7 @@ export function ConversationsShell({ data }: { data: ConversationsData }) {
       <div
         className={`${
           mobilePane === "thread" ? "flex" : "hidden"
-        } min-w-0 flex-1 flex-col md:flex`}
+        } min-h-0 min-w-0 flex-1 flex-col md:flex`}
       >
         <ConversationView
           conversation={selected}
@@ -207,7 +209,7 @@ export function ConversationsShell({ data }: { data: ConversationsData }) {
       <div
         className={`${
           mobilePane === "context" ? "flex" : "hidden"
-        } w-full xl:flex xl:w-auto`}
+        } min-h-0 w-full xl:flex xl:w-auto`}
       >
         <ContextPanel
           conversation={selected}
