@@ -25,7 +25,7 @@ export type ThemeId = (typeof THEME_IDS)[number];
 
 export const DEFAULT_THEME: ThemeId = "violet";
 
-export const STORAGE_KEY = "wacrm.theme";
+export const STORAGE_KEY = "forceia.theme";
 
 /**
  * MODE — the light/dark dimension, orthogonal to the accent theme.
@@ -45,7 +45,7 @@ export type Mode = (typeof MODES)[number];
 
 export const DEFAULT_MODE: Mode = "dark";
 
-export const MODE_STORAGE_KEY = "wacrm.mode";
+export const MODE_STORAGE_KEY = "forceia.mode";
 
 export function isMode(value: unknown): value is Mode {
   return (
@@ -69,9 +69,9 @@ export interface ThemeMeta {
 export const THEMES: ReadonlyArray<ThemeMeta> = [
   {
     id: "violet",
-    name: "Violet",
-    tagline: "The default — confident, slightly playful.",
-    swatch: "oklch(0.526 0.247 293)",
+    name: "Signal",
+    tagline: "ForceIA default — Signal Cyan on neutral canvas.",
+    swatch: "#27C6E5",
   },
   {
     id: "emerald",
