@@ -1,8 +1,8 @@
 {
-  "name": "wacrm",
+  "name": "forceia",
   "version": "0.8.0",
   "private": true,
-  "description": "Self-hostable CRM template for WhatsApp built on Next.js and Supabase — shared inbox, contacts, sales pipelines, broadcasts, and no-code automations.",
+  "description": "ForceIA — operação comercial com agentes de IA. Built on a WhatsApp messaging and automation foundation (Next.js + Supabase).",
   "license": "MIT",
   "author": "Arnas Donauskas",
   "homepage": "https://github.com/ArnasDon/wacrm",
@@ -14,15 +14,15 @@
     "url": "https://github.com/ArnasDon/wacrm/issues"
   },
   "keywords": [
-    "crm",
+    "forceia",
+    "ai-agents",
     "whatsapp",
     "whatsapp-business-api",
     "nextjs",
     "supabase",
     "automation",
-    "broadcast",
-    "self-hosted",
-    "template"
+    "commercial-operations",
+    "self-hosted"
   ],
   "engines": {
     "node": ">=20.0.0"
